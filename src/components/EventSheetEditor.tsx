@@ -650,7 +650,7 @@ export default function EventSheetEditor({
   const selectedScFile = scripts.find(s => s.id === selectedScriptId);
 
   return (
-    <div className="flex-1 flex overflow-hidden bg-[#0c0d12]" id="event_sheet_root">
+    <div className="flex-1 flex overflow-hidden bg-[#1E1F26]" id="event_sheet_root">
       
       {/* LEFT SIDE PANEL: Config Tab Selectors and Variables */}
       <div className="w-64 bg-[#14151e] border-r border-[#262732] flex flex-col justify-stretch p-4 space-y-4 shrink-0">

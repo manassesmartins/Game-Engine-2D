@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useRef, useEffect } from 'react';
-import { Scene, ProjectObject, ObjectInstance, TileDef, SceneLayer } from '../types';
-import { Move, GripHorizontal, LayoutGrid, Trash2, Plus, Sliders, Layers, Eye, EyeOff, Settings, Sparkles, PlusCircle } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Scene, ProjectObject, ObjectInstance, TileDef, SceneLayer, TileMapLayer } from '../types';
+import { Move, GripHorizontal, LayoutGrid, Trash2, Plus, Sliders, Layers, Eye, EyeOff, Settings, Sparkles, PlusCircle, PaintBucket, Eraser, Square, MousePointer2 } from 'lucide-react';
 
 interface SceneEditorProps {
   scene: Scene;
@@ -51,7 +51,9 @@ export default function SceneEditor({
   const [initialInstancesPositions, setInitialInstancesPositions] = useState<Record<string, { x: number, y: number }>>({});
 
   const [activeTileId, setActiveTileId] = useState<number | string>(1);
-  const [activeTilemapSource, setActiveTilemapSource] = useState<string>('default'); // 'default' or objectId
+  const [activeTilemapSource, setActiveTilemapSource] = useState<string>('default');
+  const [tileTool, setTileTool] = useState<'brush' | 'fill' | 'rect' | 'eraser'>('brush');
+  const [rectStart, setRectStart] = useState<{ col: number, row: number } | null>(null);
   const [snapToGrid, setSnapToGrid] = useState<boolean>(true);
   const [zoomScale, setZoomScale] = useState<number>(1);
   const [rightPanelTab, setRightPanelTab] = useState<'props' | 'layers' | 'behaviors'>('props');
@@ -67,6 +69,21 @@ export default function SceneEditor({
   ];
 
   const [activeLayerId, setActiveLayerId] = useState<string>(activeLayers[0].id);
+
+  const getOrCreateTilemap = useCallback((layerId: string): TileMapLayer => {
+    const existing = (scene.tilemaps || []).find(tm => tm.id === layerId);
+    if (existing) return existing;
+    const newTm: TileMapLayer = {
+      id: layerId,
+      name: activeLayers.find(l => l.id === layerId)?.name || 'Tilemap',
+      grid: {}
+    };
+    onUpdateScene({
+      ...scene,
+      tilemaps: [...(scene.tilemaps || []), newTm]
+    });
+    return newTm;
+  }, [scene, onUpdateScene, activeLayers]);
 
   useEffect(() => {
     // If scene layers is not set, initialize it gracefully
@@ -137,8 +154,8 @@ export default function SceneEditor({
     canvas.width = scene.width * zoomScale;
     canvas.height = scene.height * zoomScale;
 
-    // Pitch-dark workspace board background
-    ctx.fillStyle = '#0f1015';
+    // Construct 3-style layout background
+    ctx.fillStyle = '#23242B';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     const gSize = scene.gridSize * zoomScale;
@@ -152,8 +169,8 @@ export default function SceneEditor({
 
       // Draw Grid helper lines
       if (lay.parallaxX === 1.0) {
-        ctx.strokeStyle = '#1e1f2b';
-        ctx.lineWidth = 1;
+        ctx.strokeStyle = '#2E2F38';
+        ctx.lineWidth = 0.5;
         for (let x = 0; x < canvas.width; x += gSize) {
           ctx.beginPath();
           ctx.moveTo(x, 0);
@@ -168,47 +185,51 @@ export default function SceneEditor({
         }
       }
 
-      // Draw static tilemap bricks onto interactive layers only
-      if (lay.id === 'main_layer' || lay.name.toLowerCase().includes('main') || lay.name.toLowerCase().includes('jogo')) {
-        const tilemap = scene.tilemap;
-        if (tilemap && tilemap.grid) {
-          Object.entries(tilemap.grid).forEach(([coords, tileId]) => {
-            const [col, row] = coords.split(',').map(Number);
-            if (typeof tileId === 'number' || (typeof tileId === 'string' && !tileId.includes(':'))) {
-              const tid = typeof tileId === 'string' ? parseInt(tileId) : tileId;
-              const td = TILE_DEFINITIONS.find(t => t.id === tid);
-              if (td) {
-                ctx.fillStyle = td.color;
-                ctx.fillRect(col * gSize, row * gSize, gSize, gSize);
-                
-                if (td.solid) {
-                  ctx.strokeStyle = 'rgba(217, 119, 6, 0.45)';
-                  ctx.lineWidth = 1;
-                  ctx.strokeRect(col * gSize, row * gSize, gSize, gSize);
-                }
+      // Draw all tilemaps (each layer can have its own tilemap)
+      const drawTileGrid = (grid: Record<string, number | string>) => {
+        Object.entries(grid).forEach(([coords, tileId]) => {
+          const [col, row] = coords.split(',').map(Number);
+          if (typeof tileId === 'number' || (typeof tileId === 'string' && !tileId.includes(':'))) {
+            const tid = typeof tileId === 'string' ? parseInt(tileId) : tileId;
+            const td = TILE_DEFINITIONS.find(t => t.id === tid);
+            if (td) {
+              ctx.fillStyle = td.color;
+              ctx.fillRect(col * gSize, row * gSize, gSize, gSize);
+              if (td.solid) {
+                ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+                ctx.lineWidth = 0.5;
+                ctx.strokeRect(col * gSize, row * gSize, gSize, gSize);
               }
-            } else if (typeof tileId === 'string' && tileId.includes(':')) {
-              const [objId, frameId] = tileId.split(':');
-              const obj = objects.find(o => o.id === objId);
-              if (obj) {
-                const frame = obj.frames?.find(f => f.id === frameId) || obj.frames?.[0];
-                if (frame && frame.pixels.length > 0) {
-                  const pxW = gSize / frame.width;
-                  const pxH = gSize / frame.height;
-                  for (let r = 0; r < frame.height; r++) {
-                    for (let c = 0; c < frame.width; c++) {
-                      const color = frame.pixels[r * frame.width + c];
-                      if (color) {
-                        ctx.fillStyle = color;
-                        ctx.fillRect(col * gSize + c * pxW, row * gSize + r * pxH, pxW + 0.5, pxH + 0.5);
-                      }
+            }
+          } else if (typeof tileId === 'string' && tileId.includes(':')) {
+            const [objId, frameId] = tileId.split(':');
+            const obj = objects.find(o => o.id === objId);
+            if (obj) {
+              const frame = obj.frames?.find(f => f.id === frameId) || obj.frames?.[0];
+              if (frame && frame.pixels.length > 0) {
+                const pxW = gSize / frame.width;
+                const pxH = gSize / frame.height;
+                for (let r = 0; r < frame.height; r++) {
+                  for (let c = 0; c < frame.width; c++) {
+                    const color = frame.pixels[r * frame.width + c];
+                    if (color) {
+                      ctx.fillStyle = color;
+                      ctx.fillRect(col * gSize + c * pxW, row * gSize + r * pxH, pxW + 0.5, pxH + 0.5);
                     }
                   }
                 }
               }
             }
-          });
-        }
+          }
+        });
+      };
+
+      // Draw all tilemaps for this layer (associate by layer ID)
+      const layerTilemaps = (scene.tilemaps || []).filter(tm => tm.id === lay.id);
+      layerTilemaps.forEach(tm => { if (tm.grid) drawTileGrid(tm.grid); });
+      // Also draw the legacy single tilemap on main layers
+      if ((lay.id === 'main_layer' || lay.id === 'default_lay') && scene.tilemap && scene.tilemap.grid) {
+        drawTileGrid(scene.tilemap.grid);
       }
 
       // Draw active instances associated to this level layer depth
@@ -272,18 +293,18 @@ export default function SceneEditor({
         // Overlay selection borders
         const isMultiSelected = selectedInstanceIds.includes(inst.id);
         if (isSelected || isMultiSelected) {
-          ctx.strokeStyle = isSelected ? '#6366f1' : '#ec4899'; // Indigo for primary focus, pink for secondary additions
+          ctx.strokeStyle = isSelected ? '#FFA000' : '#FFB300';
           ctx.lineWidth = 2;
           ctx.strokeRect(inst.x * zoomScale - 2, inst.y * zoomScale - 2, instWidthZoom + 4, instHeightZoom + 4);
           
           // Little interactive pivot visualizer
-          ctx.fillStyle = isSelected ? '#6366f1' : '#ec4899';
+          ctx.fillStyle = isSelected ? '#FFA000' : '#FFB300';
           ctx.beginPath();
           ctx.arc((inst.x + inst.width * ox) * zoomScale, (inst.y + inst.height * oy) * zoomScale, 4, 0, Math.PI * 2);
           ctx.fill();
         } else {
-          ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-          ctx.lineWidth = 0.8;
+          ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+          ctx.lineWidth = 0.5;
           ctx.strokeRect(inst.x * zoomScale, inst.y * zoomScale, instWidthZoom, instHeightZoom);
         }
       });
@@ -291,10 +312,10 @@ export default function SceneEditor({
       // Draw the beautiful dashed translucent selection box overlay if box selecting
       if (editorMode === 'instances' && isSelectingBox && selectionStart && selectionEnd) {
         ctx.save();
-        ctx.fillStyle = 'rgba(99, 102, 241, 0.15)'; // translucent blue-indigo
-        ctx.strokeStyle = '#6366f1';
+        ctx.fillStyle = 'rgba(255, 160, 0, 0.12)';
+        ctx.strokeStyle = '#FFA000';
         ctx.lineWidth = 1.5;
-        ctx.setLineDash([4, 4]); // dashed lines
+        ctx.setLineDash([4, 4]);
         
         const boxX = Math.min(selectionStart.x, selectionEnd.x) * zoomScale;
         const boxY = Math.min(selectionStart.y, selectionEnd.y) * zoomScale;
@@ -310,6 +331,55 @@ export default function SceneEditor({
     });
   };
 
+  const paintTile = (col: number, row: number) => {
+    const tm = getOrCreateTilemap(activeLayerId);
+    const updatedGrid = { ...tm.grid };
+    const key = `${col},${row}`;
+    updatedGrid[key] = activeTileId;
+    const updatedTilemaps = (scene.tilemaps || []).map(t => t.id === tm.id ? { ...tm, grid: updatedGrid } : t);
+    if (!updatedTilemaps.find(t => t.id === tm.id)) {
+      updatedTilemaps.push({ ...tm, grid: updatedGrid });
+    }
+    onUpdateScene({ ...scene, tilemaps: updatedTilemaps });
+  };
+
+  const eraseTile = (col: number, row: number) => {
+    const tm = getOrCreateTilemap(activeLayerId);
+    const updatedGrid = { ...tm.grid };
+    const key = `${col},${row}`;
+    delete updatedGrid[key];
+    const updatedTilemaps = (scene.tilemaps || []).map(t => t.id === tm.id ? { ...tm, grid: updatedGrid } : t);
+    onUpdateScene({ ...scene, tilemaps: updatedTilemaps });
+  };
+
+  const floodFill = (col: number, row: number, fillId: number | string) => {
+    const tm = getOrCreateTilemap(activeLayerId);
+    const grid = { ...tm.grid };
+    const gs = scene.gridSize;
+    const cols = Math.ceil(scene.width / gs);
+    const rows = Math.ceil(scene.height / gs);
+    const target = grid[`${col},${row}`];
+    if (target === fillId) return;
+
+    const visited = new Set<string>();
+    const stack = [`${col},${row}`];
+    while (stack.length > 0) {
+      const key = stack.pop()!;
+      if (visited.has(key)) continue;
+      visited.add(key);
+      const [cx, cy] = key.split(',').map(Number);
+      const existing = grid[key];
+      if (existing === undefined || existing !== target) continue;
+      grid[key] = fillId;
+      if (cx > 0) stack.push(`${cx - 1},${cy}`);
+      if (cx < cols - 1) stack.push(`${cx + 1},${cy}`);
+      if (cy > 0) stack.push(`${cx},${cy - 1}`);
+      if (cy < rows - 1) stack.push(`${cx},${cy + 1}`);
+    }
+    const updatedTilemaps = (scene.tilemaps || []).map(t => t.id === tm.id ? { ...tm, grid } : t);
+    onUpdateScene({ ...scene, tilemaps: updatedTilemaps });
+  };
+
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -323,18 +393,16 @@ export default function SceneEditor({
       const gs = scene.gridSize;
       const col = Math.floor(mouseX / gs);
       const row = Math.floor(mouseY / gs);
-      const key = `${col},${row}`;
 
-      const updatedGrid = { ...scene.tilemap.grid };
-      if (e.buttons === 1) { // Left-click: paint
-        updatedGrid[key] = activeTileId;
-      } else if (e.buttons === 2 || (e.buttons === 1 && e.shiftKey)) { // Erase
-        delete updatedGrid[key];
+      if (tileTool === 'brush') {
+        if (e.buttons === 1) paintTile(col, row);
+      } else if (tileTool === 'eraser') {
+        if (e.buttons === 1) eraseTile(col, row);
+      } else if (tileTool === 'fill') {
+        if (e.buttons === 1) floodFill(col, row, activeTileId);
+      } else if (tileTool === 'rect') {
+        setRectStart({ col, row });
       }
-      onUpdateScene({
-        ...scene,
-        tilemap: { ...scene.tilemap, grid: updatedGrid }
-      });
       return;
     }
 
@@ -434,19 +502,21 @@ export default function SceneEditor({
     
     const mouseX = (e.clientX - rect.left) / zoomScale;
     const mouseY = (e.clientY - rect.top) / zoomScale;
+    lastMousePos.current = { x: mouseX, y: mouseY };
 
     // 1. TILEMAP MODE
-    if (editorMode === 'tiles' && e.buttons === 1) {
-      const gs = scene.gridSize;
-      const col = Math.floor(mouseX / gs);
-      const row = Math.floor(mouseY / gs);
-      const key = `${col},${row}`;
-      const updatedGrid = { ...scene.tilemap.grid };
-      updatedGrid[key] = activeTileId;
-      onUpdateScene({
-        ...scene,
-        tilemap: { ...scene.tilemap, grid: updatedGrid }
-      });
+    if (editorMode === 'tiles') {
+      if (tileTool === 'brush' && e.buttons === 1) {
+        const gs = scene.gridSize;
+        const col = Math.floor(mouseX / gs);
+        const row = Math.floor(mouseY / gs);
+        paintTile(col, row);
+      } else if (tileTool === 'eraser' && e.buttons === 1) {
+        const gs = scene.gridSize;
+        const col = Math.floor(mouseX / gs);
+        const row = Math.floor(mouseY / gs);
+        eraseTile(col, row);
+      }
       return;
     }
 
@@ -516,7 +586,31 @@ export default function SceneEditor({
     }
   };
 
+  const lastMousePos = useRef<{ x: number, y: number }>({ x: 0, y: 0 });
+
   const handleCanvasMouseUp = () => {
+    if (editorMode === 'tiles' && tileTool === 'rect' && rectStart) {
+      const tm = getOrCreateTilemap(activeLayerId);
+      const gs = scene.gridSize;
+      const mouseX = lastMousePos.current.x;
+      const mouseY = lastMousePos.current.y;
+      const endCol = Math.floor(mouseX / gs);
+      const endRow = Math.floor(mouseY / gs);
+      const minCol = Math.min(rectStart.col, endCol);
+      const maxCol = Math.max(rectStart.col, endCol);
+      const minRow = Math.min(rectStart.row, endRow);
+      const maxRow = Math.max(rectStart.row, endRow);
+      const updatedGrid = { ...tm.grid };
+      for (let r = minRow; r <= maxRow; r++) {
+        for (let c = minCol; c <= maxCol; c++) {
+          updatedGrid[`${c},${r}`] = activeTileId;
+        }
+      }
+      const updatedTilemaps = (scene.tilemaps || []).map(t => t.id === tm.id ? { ...tm, grid: updatedGrid } : t);
+      onUpdateScene({ ...scene, tilemaps: updatedTilemaps });
+      setRectStart(null);
+    }
+
     setIsSelectingBox(false);
     setSelectionStart(null);
     setSelectionEnd(null);
@@ -675,66 +769,94 @@ export default function SceneEditor({
   const selectedInstObjDef = selectedInst ? objects.find(o => o.id === selectedInst.objectTypeId) : null;
 
   return (
-    <div className="flex-1 flex overflow-hidden bg-[#0c0d12]" id="scene_editor_root">
+    <div className="flex-1 flex overflow-hidden bg-[#1E1F26]" id="scene_editor_root">
       
       {/* LEFT SIDE PANEL: Barra de Propriedades (Inspector) */}
-      <div className="w-64 bg-[#14151e] border-r border-[#262732] flex flex-col justify-stretch overflow-y-auto">
-        <div className="p-3 border-b border-slate-800 bg-[#1a1b26]">
-          <span className="text-xs font-bold text-slate-300 tracking-wider flex items-center gap-1.5 uppercase font-mono">
-            <Sliders className="w-4 h-4 text-[#818cf8]" /> Propriedades
+      <div className="w-64 bg-[#26272E] border-r border-[#3A3B44] flex flex-col justify-stretch overflow-y-auto">
+        <div className="p-2.5 border-b border-[#3A3B44] bg-[#2B2C33]">
+          <span className="text-[11px] font-bold text-[#E0E0E0] tracking-wider flex items-center gap-1.5 uppercase">
+            <Sliders className="w-3.5 h-3.5 text-[#FFA000]" /> Propriedades
           </span>
         </div>
         
-        <div className="p-4 space-y-4">
+        <div className="p-3 space-y-3">
           {editorMode === 'tiles' ? (
-            <div className="space-y-4">
-              <span className="text-xs font-bold text-slate-400 tracking-wider flex items-center gap-2 uppercase font-mono">
-                <GripHorizontal className="w-4 h-4 text-emerald-400" /> Paleta de Tiles
-              </span>
-              <p className="text-[10px] text-gray-400 leading-normal">Escolha a fonte do Tilemap e as texturas para desenhar na grade:</p>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-[#E0E0E0] tracking-wider flex items-center gap-2 uppercase">
+                  <GripHorizontal className="w-3.5 h-3.5 text-[#FFA000]" /> Paleta de Tiles
+                </span>
+              </div>
+
+              {/* Tile paint tools */}
+              <div className="flex gap-1 bg-[#1E1F26] p-1 rounded border border-[#3A3B44]">
+                {[
+                  { id: 'brush' as const, icon: MousePointer2, label: 'Pincel' },
+                  { id: 'fill' as const, icon: PaintBucket, label: 'Preencher' },
+                  { id: 'rect' as const, icon: Square, label: 'Retângulo' },
+                  { id: 'eraser' as const, icon: Eraser, label: 'Borracha' },
+                ].map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => setTileTool(t.id)}
+                    className={`flex-1 text-[9px] py-1 rounded flex items-center justify-center gap-1 font-bold transition-all ${
+                      tileTool === t.id ? 'bg-[#FFA000] text-white' : 'text-[#888] hover:text-white'
+                    }`}
+                  >
+                    <t.icon className="w-3 h-3" />
+                  </button>
+                ))}
+              </div>
+
+              {/* Tilemap layer selector */}
+              <div className="text-[10px] text-[#888]">
+                Camada ativa: <span className="text-[#FFA000] font-bold">{activeLayers.find(l => l.id === activeLayerId)?.name || 'N/A'}</span>
+              </div>
               
               <select
                 value={activeTilemapSource}
                 onChange={(e) => setActiveTilemapSource(e.target.value)}
-                className="w-full bg-[#0c0d12] border border-slate-800 text-xs text-indigo-300 font-bold rounded-lg p-2 font-mono outline-none focus:border-indigo-500 transition-colors"
+                className="w-full bg-[#1E1F26] border border-[#3A3B44] text-xs text-[#E0E0E0] font-medium rounded p-1.5 outline-none focus:border-[#FFA000] transition-colors"
               >
                 <option value="default">Paleta Padrão (Cores)</option>
                 {objects.filter(o => o.type === 'sprite' || o.type === 'tilemap').map(o => (
-                  <option key={o.id} value={o.id}>🎨 Sprite: {o.name}</option>
+                  <option key={o.id} value={o.id}>{o.name}</option>
                 ))}
               </select>
 
               {activeTilemapSource === 'default' ? (
-                <div className="grid grid-cols-1 gap-2.5">
+                <div className="grid grid-cols-1 gap-1.5">
                   {TILE_DEFINITIONS.map(td => (
                     <div
                       key={td.id}
                       onClick={() => setActiveTileId(td.id)}
-                      className={`p-2.5 rounded-xl cursor-pointer flex items-center gap-3 border transition-all ${
+                      className={`p-2 rounded cursor-pointer flex items-center gap-2.5 border transition-all ${
                         activeTileId === td.id
-                          ? 'bg-indigo-950/10 border-indigo-600/60 text-indigo-300'
-                          : 'bg-[#181923] border-[#22232a] hover:border-slate-800'
+                          ? 'bg-[#3A3B44] border-[#FFA000]'
+                          : 'bg-[#2B2C33] border-[#3A3B44] hover:border-[#5A5B64]'
                       }`}
                     >
-                      <div className="w-10 h-10 rounded-lg border border-gray-700/60 shrink-0 shadow-md" style={{ backgroundColor: td.color }}></div>
-                      <div>
-                        <span className="text-xs font-bold text-slate-200 block">{td.name}</span>
-                        <span className="text-[9px] text-[#94a3b8] block mt-0.5">{td.solid ? '🔒 Comportamento Sólido' : '🌊 Atravessável'}</span>
+                      <div className="w-8 h-8 rounded border border-[#4A4B54] shrink-0" style={{ backgroundColor: td.color }}></div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-xs font-medium text-[#E0E0E0] block truncate">{td.name}</span>
+                        <span className="text-[9px] text-[#888] block mt-0.5">
+                          {td.solid ? 'Sólido' : 'Atravessável'}
+                        </span>
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="grid grid-cols-3 gap-2">
-                  {objects.find(o => o.id === activeTilemapSource)?.frames?.map((frame, idx) => {
+                <div className="grid grid-cols-2 gap-1.5">
+                  {objects.find(o => o.id === activeTilemapSource)?.frames?.map((frame) => {
                     const tileStrId = `${activeTilemapSource}:${frame.id}`;
                     const isSelected = activeTileId === tileStrId;
                     return (
                       <div
                         key={frame.id}
                         onClick={() => setActiveTileId(tileStrId)}
-                        className={`aspect-square rounded-lg flex items-center justify-center p-1 cursor-pointer overflow-hidden border transition-all relative ${
-                          isSelected ? 'bg-indigo-900 border-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]' : 'bg-[#181923] border-slate-700 hover:border-slate-500 hover:bg-[#1a1b26]'
+                        className={`aspect-square rounded flex items-center justify-center p-0.5 cursor-pointer overflow-hidden border transition-all relative ${
+                          isSelected ? 'bg-[#3A3B44] border-[#FFA000]' : 'bg-[#2B2C33] border-[#3A3B44] hover:border-[#5A5B64]'
                         }`}
                       >
                         <div
@@ -749,9 +871,6 @@ export default function SceneEditor({
                             <div key={i} style={{ backgroundColor: color || 'transparent' }}></div>
                           ))}
                         </div>
-                        {isSelected && (
-                          <div className="absolute inset-0 ring-2 ring-indigo-400 rounded-lg pointer-events-none"></div>
-                        )}
                       </div>
                     );
                   })}
@@ -759,109 +878,109 @@ export default function SceneEditor({
               )}
             </div>
           ) : selectedInst && selectedInstObjDef ? (
-                <div className="space-y-4" id="properties_inspector_fields">
-                  <div className="bg-[#1c1d29] p-3 rounded-xl border border-indigo-500/30 shadow-md">
-                    <span className="text-[9px] text-[#818cf8] font-mono block">INSTÂNCIA: {selectedInst.id}</span>
-                    <span className="text-xs font-bold text-slate-200 mt-0.5 block">{selectedInstObjDef.name} ({selectedInstObjDef.type})</span>
+                <div className="space-y-3" id="properties_inspector_fields">
+                  <div className="bg-[#2B2C33] p-2.5 rounded border border-[#FFA000]/30">
+                    <span className="text-[8px] text-[#FFA000] block">INSTÂNCIA: {selectedInst.id}</span>
+                    <span className="text-xs font-bold text-[#E0E0E0] mt-0.5 block">{selectedInstObjDef.name} ({selectedInstObjDef.type})</span>
                   </div>
 
                   <div className="space-y-3.5">
                     <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wide block mb-1">X (px)</label>
+                          <label className="text-[9px] font-medium text-[#888] uppercase tracking-wide block mb-1">X (px)</label>
                           <input
                             type="number"
                             value={selectedInst.x}
                             onChange={(e) => handleUpdateInstanceProperty('x', parseInt(e.target.value) || 0)}
-                            className="w-full bg-[#0c0d12] border border-slate-800 focus:border-indigo-500 text-xs text-white rounded p-1.5 font-mono"
+                            className="w-full bg-[#1E1F26] border border-[#3A3B44] focus:border-[#FFA000] text-xs text-[#E0E0E0] rounded p-1.5"
                           />
                         </div>
                         <div>
-                          <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wide block mb-1">Y (px)</label>
+                          <label className="text-[9px] font-medium text-[#888] uppercase tracking-wide block mb-1">Y (px)</label>
                           <input
                             type="number"
                             value={selectedInst.y}
                             onChange={(e) => handleUpdateInstanceProperty('y', parseInt(e.target.value) || 0)}
-                            className="w-full bg-[#0c0d12] border border-slate-800 focus:border-indigo-500 text-xs text-white rounded p-1.5 font-mono"
+                            className="w-full bg-[#1E1F26] border border-[#3A3B44] focus:border-[#FFA000] text-xs text-[#E0E0E0] rounded p-1.5"
                           />
                         </div>
                       </div>
 
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wide block mb-1">L (Largura)</label>
+                          <label className="text-[9px] font-medium text-[#888] uppercase tracking-wide block mb-1">Largura</label>
                           <input
                             type="number"
                             value={selectedInst.width}
                             onChange={(e) => handleUpdateInstanceProperty('width', parseInt(e.target.value) || 32)}
-                            className="w-full bg-[#0c0d12] border border-slate-800 focus:border-indigo-500 text-xs text-white rounded p-1.5 font-mono"
+                            className="w-full bg-[#1E1F26] border border-[#3A3B44] focus:border-[#FFA000] text-xs text-[#E0E0E0] rounded p-1.5"
                           />
                         </div>
                         <div>
-                          <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wide block mb-1">H (Altura)</label>
+                          <label className="text-[9px] font-medium text-[#888] uppercase tracking-wide block mb-1">Altura</label>
                           <input
                             type="number"
                             value={selectedInst.height}
                             onChange={(e) => handleUpdateInstanceProperty('height', parseInt(e.target.value) || 32)}
-                            className="w-full bg-[#0c0d12] border border-slate-800 focus:border-indigo-500 text-xs text-white rounded p-1.5 font-mono"
+                            className="w-full bg-[#1E1F26] border border-[#3A3B44] focus:border-[#FFA000] text-xs text-[#E0E0E0] rounded p-1.5"
                           />
                         </div>
                       </div>
 
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wide block mb-1">Origem X</label>
+                          <label className="text-[9px] font-medium text-[#888] uppercase tracking-wide block mb-1">Origem X</label>
                           <input
                             type="number"
                             step="0.1"
                             min="0" max="1"
                             value={selectedInst.originX ?? 0.5}
                             onChange={(e) => handleUpdateInstanceProperty('originX', parseFloat(e.target.value) ?? 0.5)}
-                            className="w-full bg-[#0c0d12] border border-slate-800 focus:border-indigo-500 text-xs text-white rounded p-1.5 font-mono"
+                            className="w-full bg-[#1E1F26] border border-[#3A3B44] focus:border-[#FFA000] text-xs text-[#E0E0E0] rounded p-1.5"
                           />
                         </div>
                         <div>
-                          <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wide block mb-1">Origem Y</label>
+                          <label className="text-[9px] font-medium text-[#888] uppercase tracking-wide block mb-1">Origem Y</label>
                           <input
                             type="number"
                             step="0.1"
                             min="0" max="1"
                             value={selectedInst.originY ?? 0.5}
                             onChange={(e) => handleUpdateInstanceProperty('originY', parseFloat(e.target.value) ?? 0.5)}
-                            className="w-full bg-[#0c0d12] border border-slate-800 focus:border-indigo-500 text-xs text-white rounded p-1.5 font-mono"
+                            className="w-full bg-[#1E1F26] border border-[#3A3B44] focus:border-[#FFA000] text-xs text-[#E0E0E0] rounded p-1.5"
                           />
                         </div>
                       </div>
 
                       <div className="grid grid-cols-1 gap-2">
                         <div>
-                          <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wide block mb-1">Ângulo (º)</label>
+                          <label className="text-[9px] font-medium text-[#888] uppercase tracking-wide block mb-1">Ângulo (º)</label>
                           <input
                             type="number"
                             value={selectedInst.angle}
                             onChange={(e) => handleUpdateInstanceProperty('angle', parseInt(e.target.value) || 0)}
-                            className="w-full bg-[#0c0d12] border border-slate-800 focus:border-indigo-500 text-xs text-white rounded p-1.5 font-mono"
+                            className="w-full bg-[#1E1F26] border border-[#3A3B44] focus:border-[#FFA000] text-xs text-[#E0E0E0] rounded p-1.5"
                           />
                         </div>
                         <div>
-                          <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wide block mb-1">Opacidade (0 a 1)</label>
+                          <label className="text-[9px] font-medium text-[#888] uppercase tracking-wide block mb-1">Opacidade (0 a 1)</label>
                           <input
                             type="number"
                             step="0.1"
                             min="0" max="1"
                             value={selectedInst.opacity}
                             onChange={(e) => handleUpdateInstanceProperty('opacity', parseFloat(e.target.value) || 1)}
-                            className="w-full bg-[#0c0d12] border border-slate-800 focus:border-indigo-500 text-xs text-white rounded p-1.5 font-mono"
+                            className="w-full bg-[#1E1F26] border border-[#3A3B44] focus:border-[#FFA000] text-xs text-[#E0E0E0] rounded p-1.5"
                           />
                         </div>
                       </div>
 
                       <div>
-                        <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wide block mb-1">Efeitos Visuais Shader</label>
+                        <label className="text-[9px] font-medium text-[#888] uppercase tracking-wide block mb-1">Efeitos Visuais</label>
                         <select
                           value={selectedInst.effectFilter || 'none'}
                           onChange={(e) => handleUpdateInstanceProperty('effectFilter', e.target.value)}
-                          className="w-full bg-[#0c0d12] border border-slate-800 text-xs text-slate-100 rounded p-1.5 font-bold outline-none"
+                          className="w-full bg-[#1E1F26] border border-[#3A3B44] text-xs text-[#E0E0E0] rounded p-1.5 outline-none focus:border-[#FFA000]"
                         >
                           <option value="none">Nenhum Filtro</option>
                           <option value="grayscale">Preto e Branco</option>
@@ -874,11 +993,11 @@ export default function SceneEditor({
                       </div>
 
                       <div>
-                        <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wide block mb-1">Blend Mode (Fusão)</label>
+                        <label className="text-[9px] font-medium text-[#888] uppercase tracking-wide block mb-1">Blend Mode (Fusão)</label>
                         <select
                           value={selectedInst.blendMode || 'normal'}
                           onChange={(e) => handleUpdateInstanceProperty('blendMode', e.target.value)}
-                          className="w-full bg-[#0c0d12] border border-slate-800 text-xs text-slate-100 rounded p-1.5 font-bold outline-none"
+                          className="w-full bg-[#1E1F26] border border-[#3A3B44] text-xs text-[#E0E0E0] rounded p-1.5 outline-none focus:border-[#FFA000]"
                         >
                           <option value="normal">Normal</option>
                           <option value="add">Adicionar (Add)</option>
@@ -888,11 +1007,11 @@ export default function SceneEditor({
                       </div>
 
                       <div>
-                        <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wide block mb-1">Associa Camada</label>
+                        <label className="text-[9px] font-medium text-[#888] uppercase tracking-wide block mb-1">Camada</label>
                         <select
                           value={selectedInst.layerId || 'main_layer'}
                           onChange={(e) => handleUpdateInstanceProperty('layerId', e.target.value)}
-                          className="w-full bg-[#0c0d12] border border-slate-800 text-xs text-slate-100 rounded p-1.5 font-bold outline-none"
+                          className="w-full bg-[#1E1F26] border border-[#3A3B44] text-xs text-[#E0E0E0] rounded p-1.5 outline-none focus:border-[#FFA000]"
                         >
                           {activeLayers.map(l => (
                             <option key={l.id} value={l.id}>{l.name}</option>
@@ -902,21 +1021,21 @@ export default function SceneEditor({
                     </div>
 
                     {/* INSTANCE VARIABLES EDITOR */}
-                    <div className="border-t border-[#252632] pt-3.5 space-y-2">
-                      <span className="text-[10px] font-bold text-[#818cf8] uppercase tracking-wider block">Variáveis de Instância (Locais)</span>
+                    <div className="border-t border-[#3A3B44] pt-3 space-y-2">
+                      <span className="text-[10px] font-bold text-[#FFA000] uppercase tracking-wider block">Variáveis de Instância</span>
                       
-                      <div className="space-y-1.5">
+                      <div className="space-y-1">
                         {Object.entries(selectedInst.variables || {}).length === 0 ? (
-                          <span className="text-[9px] text-gray-500 italic block py-1.5">Nenhuma variável criada nesta instância.</span>
+                          <span className="text-[9px] text-[#666] italic block py-1">Nenhuma variável.</span>
                         ) : (
                           Object.entries(selectedInst.variables || {}).map(([vName, vVal]) => (
-                            <div key={vName} className="flex items-center gap-1 bg-[#0c0d12] border border-slate-800 p-1.5 rounded-lg text-[10px] font-mono">
-                              <span className="text-gray-400 truncate flex-1 font-semibold">{vName}: {vVal}</span>
+                            <div key={vName} className="flex items-center gap-1 bg-[#1E1F26] border border-[#3A3B44] p-1 rounded text-[10px]">
+                              <span className="text-[#888] truncate flex-1">{vName}: {vVal}</span>
                               <button 
                                 onClick={() => handleDeleteInstanceVariable(vName)}
-                                className="text-rose-400 hover:text-rose-300 p-0.5 hover:bg-slate-900 rounded"
+                                className="text-[#FF6B6B] hover:text-[#FF4444] p-0.5"
                               >
-                                <Trash2 className="w-3 h-3" />
+                                <Trash2 className="w-2.5 h-2.5" />
                               </button>
                             </div>
                           ))
@@ -924,25 +1043,25 @@ export default function SceneEditor({
                       </div>
 
                       {/* Add new local variable */}
-                      <div className="p-2 bg-[#1b1c27] rounded-lg border border-slate-800 space-y-2 mt-2">
+                      <div className="p-1.5 bg-[#2B2C33] rounded border border-[#3A3B44] space-y-1.5">
                         <input
                           type="text"
-                          placeholder="Nome da Variável"
+                          placeholder="Nome"
                           value={newVarName}
                           onChange={(e) => setNewVarName(e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-800 text-[10px] text-slate-200 rounded p-1 font-mono"
+                          className="w-full bg-[#1E1F26] border border-[#3A3B44] text-[10px] text-[#E0E0E0] rounded p-1"
                         />
-                        <div className="flex gap-1.5">
+                        <div className="flex gap-1">
                           <input
                             type="text"
                             placeholder="Valor"
                             value={newVarValue}
                             onChange={(e) => setNewVarValue(e.target.value)}
-                            className="flex-1 bg-slate-950 border border-slate-800 text-[10px] text-slate-200 rounded p-1 font-mono"
+                            className="flex-1 bg-[#1E1F26] border border-[#3A3B44] text-[10px] text-[#E0E0E0] rounded p-1"
                           />
                           <button
                             onClick={handleAddInstanceVariable}
-                            className="p-1 px-2 text-[10px] bg-indigo-600 hover:bg-indigo-700 text-white rounded font-bold transition-all active:scale-95 cursor-pointer flex items-center"
+                            className="p-1 px-1.5 text-[10px] bg-[#FFA000] hover:bg-[#FFB300] text-white rounded font-medium transition-all active:scale-95 cursor-pointer"
                           >
                             + Add
                           </button>
@@ -956,15 +1075,15 @@ export default function SceneEditor({
                         onUpdateScene({ ...scene, instances: remaining });
                         setSelectedInstanceId(null);
                       }}
-                      className="w-full flex items-center justify-center gap-1.5 text-xs bg-rose-950/20 hover:bg-rose-900/40 text-rose-400 border border-rose-900/30 py-2.5 rounded-xl transition-all font-bold cursor-pointer mt-4"
+                      className="w-full flex items-center justify-center gap-1.5 text-xs bg-[#3A1A1A] hover:bg-[#5A2A2A] text-[#FF6B6B] border border-[#5A2A2A] py-2 rounded transition-all font-medium cursor-pointer mt-3"
                     >
-                      <Trash2 className="w-4 h-4" /> Deletar Instância
+                      <Trash2 className="w-3.5 h-3.5" /> Deletar
                     </button>
                     
                     {/* INJECT BEHAVIORS CONFIG HERE */}
-                      <div className="pt-3 border-t border-[#2d2e3d] mt-4">
-                      <h4 className="text-[10px] font-bold text-slate-300 font-mono mb-2 uppercase">Comportamentos</h4>
-                      <div className="grid grid-cols-2 gap-1.5">
+                      <div className="pt-3 border-t border-[#3A3B44] mt-3">
+                      <h4 className="text-[10px] font-bold text-[#E0E0E0] mb-2 uppercase">Comportamentos</h4>
+                      <div className="grid grid-cols-2 gap-1">
                         {[
                           { name: 'Platform' },
                           { name: '8Direction' },
@@ -987,14 +1106,14 @@ export default function SceneEditor({
                             <div 
                               key={bh.name} 
                               onClick={() => handleToggleBehavior(selectedInstObjDef, bh.name)}
-                              className={`p-2 rounded border transition-all cursor-pointer flex items-center gap-2 ${
+                              className={`p-1.5 rounded border transition-all cursor-pointer flex items-center gap-1.5 ${
                                 enabled 
-                                  ? 'bg-indigo-950/40 border-indigo-500/50 text-indigo-300' 
-                                  : 'bg-[#181922] border-slate-800'
+                                  ? 'bg-[#3A3B44] border-[#FFA000] text-white' 
+                                  : 'bg-[#2B2C33] border-[#3A3B44] text-[#888]'
                               }`}
                             >
-                              <input type="checkbox" checked={enabled} readOnly className="rounded accent-indigo-500 bg-slate-900" />
-                              <span className="text-[10px] font-bold block">{bh.name}</span>
+                              <input type="checkbox" checked={enabled} readOnly className="rounded accent-[#FFA000]" />
+                              <span className="text-[9px] font-medium block">{bh.name}</span>
                             </div>
                           );
                         })}
@@ -1004,48 +1123,47 @@ export default function SceneEditor({
                     
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center h-48 border-2 border-dashed border-[#242533] rounded-xl p-4 text-center">
-                    <span className="text-2xl">👉</span>
-                    <span className="text-xs font-bold text-slate-400 mt-2 block">Nenhuma Instância Selecionada</span>
-                    <p className="text-[10px] text-gray-500 mt-1 leading-normal">Pegue um ator no painel lateral direito (Object Types) ou selecione uma instância no mapa para configurá-la.</p>
+                  <div className="flex flex-col items-center justify-center h-48 border-2 border-dashed border-[#3A3B44] rounded p-4 text-center">
+                    <span className="text-xs font-medium text-[#888] mt-2 block">Nenhuma Instância</span>
+                    <p className="text-[10px] text-[#666] mt-1">Selecione ou adicione uma instância no mapa.</p>
                   </div>
                 )}
         </div>
       </div>
 
       {/* CENTER: Main Layout Grid */}
-      <div className="flex-1 flex flex-col min-w-0 bg-[#090a0e]">
+      <div className="flex-1 flex flex-col min-w-0 bg-[#1E1F26]">
         
         {/* Workspace Toolbar */}
-        <div className="h-10 bg-[#12131a] border-b border-[#252632] px-3 flex items-center justify-between shrink-0">
+        <div className="h-9 bg-[#2B2C33] border-b border-[#3A3B44] px-3 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-1 select-none">
             <button
               onClick={() => setEditorMode('instances')}
-              className={`text-[10px] px-2 py-1.5 rounded flex items-center gap-1.5 font-bold transition-all ${
-                editorMode === 'instances' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white hover:bg-slate-900/30'
+              className={`text-[10px] px-2 py-1 rounded flex items-center gap-1.5 font-medium transition-all ${
+                editorMode === 'instances' ? 'bg-[#FFA000] text-white' : 'text-[#888] hover:text-white hover:bg-[#3A3B44]'
               }`}
             >
               <Move className="w-3 h-3" /> Instâncias
             </button>
             
             {editorMode === 'instances' && (
-              <div className="flex bg-[#0a0a0f] p-0.5 rounded border border-[#232431]/75 gap-0.5 ml-2">
+              <div className="flex bg-[#1E1F26] p-0.5 rounded border border-[#3A3B44] gap-0.5 ml-2">
                 <button
                   onClick={() => setSceneTool('select')}
-                  className={`text-[9px] px-2 py-1 rounded font-bold uppercase transition-all ${
-                    sceneTool === 'select' ? 'bg-indigo-600/30 text-indigo-300' : 'text-slate-400'
+                  className={`text-[9px] px-1.5 py-0.5 rounded font-medium uppercase transition-all ${
+                    sceneTool === 'select' ? 'bg-[#3A3B44] text-white' : 'text-[#888]'
                   }`}
-                >Selecionar</button>
+                >Sel</button>
                 <button
                   onClick={() => setSceneTool('add')}
-                  className={`text-[9px] px-2 py-1 rounded font-bold uppercase transition-all ${
-                    sceneTool === 'add' ? 'bg-indigo-600/30 text-indigo-300' : 'text-slate-400'
+                  className={`text-[9px] px-1.5 py-0.5 rounded font-medium uppercase transition-all ${
+                    sceneTool === 'add' ? 'bg-[#3A3B44] text-white' : 'text-[#888]'
                   }`}
-                >Adicionar</button>
+                >Add</button>
                 <button
                   onClick={() => setSceneTool('move')}
-                  className={`text-[9px] px-2 py-1 rounded font-bold uppercase transition-all ${
-                    sceneTool === 'move' ? 'bg-indigo-600/30 text-indigo-300' : 'text-slate-400'
+                  className={`text-[9px] px-1.5 py-0.5 rounded font-medium uppercase transition-all ${
+                    sceneTool === 'move' ? 'bg-[#3A3B44] text-white' : 'text-[#888]'
                   }`}
                 >Mover</button>
               </div>
@@ -1058,45 +1176,45 @@ export default function SceneEditor({
                   onUpdateScene({ ...scene, instances: remaining });
                   updateSelectedInstances([]);
                 }}
-                className="ml-2 bg-rose-950/50 hover:bg-rose-600 text-rose-300 hover:text-white text-[9px] font-bold py-1 px-2 rounded transition-all flex items-center gap-1 uppercase"
+                className="ml-2 bg-[#3A1A1A] hover:bg-[#5A2A2A] text-[#FF6B6B] text-[9px] font-medium py-0.5 px-1.5 rounded transition-all flex items-center gap-1 uppercase"
               >
-                <Trash2 className="w-3 h-3" /> Excluir ({selectedInstanceIds.length})
+                <Trash2 className="w-2.5 h-2.5" /> ({selectedInstanceIds.length})
               </button>
             )}
 
             <button
               onClick={() => setEditorMode('tiles')}
-              className={`ml-2 text-[10px] px-2 py-1.5 rounded flex items-center gap-1.5 font-bold transition-all ${
-                editorMode === 'tiles' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white hover:bg-slate-900/30'
+              className={`ml-2 text-[10px] px-2 py-1 rounded flex items-center gap-1.5 font-medium transition-all ${
+                editorMode === 'tiles' ? 'bg-[#FFA000] text-white' : 'text-[#888] hover:text-white hover:bg-[#3A3B44]'
               }`}
             >
               <LayoutGrid className="w-3 h-3" /> Tilemap
             </button>
           </div>
 
-          <div className="flex items-center gap-3">
-            <label className="flex items-center gap-1.5 text-[10px] text-slate-400 cursor-pointer font-bold uppercase">
-              <input type="checkbox" checked={snapToGrid} onChange={(e) => setSnapToGrid(e.target.checked)} className="rounded accent-indigo-505 w-3 h-3" />
-              Snap ({scene.gridSize}px)
+          <div className="flex items-center gap-2">
+            <label className="flex items-center gap-1 text-[10px] text-[#888] cursor-pointer font-medium uppercase">
+              <input type="checkbox" checked={snapToGrid} onChange={(e) => setSnapToGrid(e.target.checked)} className="rounded accent-[#FFA000] w-2.5 h-2.5" />
+              Snap
             </label>
             <div className="flex items-center gap-1">
-              <button onClick={() => setZoomScale(Math.max(0.5, zoomScale - 0.25))} className="p-1 px-2 text-[10px] bg-slate-800 text-white rounded font-bold hover:bg-slate-700">-</button>
-              <span className="text-[10px] text-indigo-400 w-8 text-center font-bold">{(zoomScale * 100).toFixed(0)}%</span>
-              <button onClick={() => setZoomScale(Math.min(2, zoomScale + 0.25))} className="p-1 px-2 text-[10px] bg-slate-800 text-white rounded font-bold hover:bg-slate-700">+</button>
+              <button onClick={() => setZoomScale(Math.max(0.5, zoomScale - 0.25))} className="p-0.5 px-1.5 text-[10px] bg-[#3A3B44] text-[#E0E0E0] rounded font-medium hover:bg-[#4A4B54]">-</button>
+              <span className="text-[10px] text-[#FFA000] w-8 text-center font-medium">{(zoomScale * 100).toFixed(0)}%</span>
+              <button onClick={() => setZoomScale(Math.min(2, zoomScale + 0.25))} className="p-0.5 px-1.5 text-[10px] bg-[#3A3B44] text-[#E0E0E0] rounded font-medium hover:bg-[#4A4B54]">+</button>
             </div>
           </div>
         </div>
 
         {/* Canvas Frame Wrapper */}
-        <div className="flex-1 overflow-auto p-12 flex items-center justify-center relative shadow-inner">
-          <div className="relative border border-dashed border-slate-700 bg-[#111218]/90 rounded-xl shadow-[0_0_50px_rgba(0,0,0,0.5)] p-0.5">
-            <div className="absolute -top-6 left-0 text-[10px] text-[#4f536e] font-mono select-none font-bold">DIMENSÕES: {scene.width}x{scene.height}px</div>
+        <div className="flex-1 overflow-auto p-8 flex items-center justify-center relative">
+          <div className="relative border border-[#3A3B44] bg-[#23242B]/90 rounded shadow-lg p-0.5">
+            <div className="absolute -top-5 left-0 text-[9px] text-[#666] select-none font-medium">{scene.width}x{scene.height}px</div>
             <canvas
               ref={canvasRef}
               onMouseDown={handleCanvasMouseDown}
               onMouseMove={handleCanvasMouseMove}
               onMouseUp={handleCanvasMouseUp}
-              className="cursor-crosshair block rounded-lg bg-cover"
+              className="cursor-crosshair block rounded bg-cover"
               id="layout_drawing_stage"
             />
           </div>
@@ -1104,35 +1222,35 @@ export default function SceneEditor({
       </div>
 
       {/* RIGHT SIDE PANEL: Project Browser & Layers */}
-      <div className="w-64 bg-[#14151e] border-l border-[#262732] flex flex-col justify-stretch">
+      <div className="w-64 bg-[#26272E] border-l border-[#3A3B44] flex flex-col justify-stretch">
         
-        {/* TOP HALF: Project Browser (Fake object Types list) */}
-        <div className="h-1/2 flex flex-col border-b border-[#262732]">
-          <div className="flex h-8 bg-[#1a1b26] border-b border-slate-800 shrink-0 px-3 items-center">
-             <span className="text-[10px] uppercase font-bold tracking-wider text-indigo-400">Object Types</span>
+        {/* TOP HALF: Project Browser */}
+        <div className="h-1/2 flex flex-col border-b border-[#3A3B44]">
+          <div className="flex h-7 bg-[#2B2C33] border-b border-[#3A3B44] shrink-0 px-3 items-center">
+             <span className="text-[10px] uppercase font-bold tracking-wider text-[#E0E0E0]">Object Types</span>
           </div>
           <div className="flex-1 overflow-y-auto p-2">
-            <div className="flex justify-end mb-2">
-              <button onClick={onAddObject} className="text-[9px] bg-indigo-600 text-white p-1 px-2 rounded hover:bg-indigo-500 font-bold uppercase flex items-center gap-1">+ Novo Tipo</button>
+            <div className="flex justify-end mb-1.5">
+              <button onClick={onAddObject} className="text-[9px] bg-[#FFA000] text-white p-0.5 px-1.5 rounded hover:bg-[#FFB300] font-medium uppercase flex items-center gap-1">+ Novo</button>
             </div>
             {objects.length === 0 ? (
-              <p className="text-[10px] text-gray-500 italic text-center py-4">Nenhum objeto criado.</p>
+              <p className="text-[10px] text-[#666] italic text-center py-4">Nenhum objeto.</p>
             ) : (
-              <div className="grid grid-cols-3 gap-1.5">
+              <div className="grid grid-cols-3 gap-1">
                 {objects.map(obj => (
                   <div
                     key={obj.id}
                     onClick={() => onSelectObject(obj)}
-                    className={`flex flex-col items-center justify-center p-2 rounded cursor-pointer transition-all border ${
+                    className={`flex flex-col items-center justify-center p-1 rounded cursor-pointer transition-all border ${
                       selectedObject?.id === obj.id
-                        ? 'bg-indigo-900/30 border-indigo-500 text-white'
-                        : 'bg-slate-800/50 border-slate-700/50 text-slate-400 hover:bg-slate-800'
+                        ? 'bg-[#3A3B44] border-[#FFA000] text-white'
+                        : 'bg-[#2B2C33] border-[#3A3B44] text-[#888] hover:bg-[#3A3B44]'
                     }`}
                   >
-                    <div className="w-6 h-6 rounded flex items-center justify-center text-xs" style={{ backgroundColor: obj.primaryColor + '20', color: obj.primaryColor }}>
-                      {obj.type === 'tilemap' ? '🧱' : '👾'}
+                    <div className="w-5 h-5 rounded flex items-center justify-center text-xs" style={{ backgroundColor: obj.primaryColor + '30', color: obj.primaryColor }}>
+                      S
                     </div>
-                    <span className="text-[8px] mt-1 text-center font-bold truncate w-full">{obj.name}</span>
+                    <span className="text-[7px] mt-0.5 text-center font-medium truncate w-full">{obj.name}</span>
                   </div>
                 ))}
               </div>
@@ -1142,33 +1260,33 @@ export default function SceneEditor({
 
         {/* BOTTOM HALF: Layers */}
         <div className="flex-1 flex flex-col">
-          <div className="flex h-8 bg-[#1a1b26] border-b border-slate-800 shrink-0 px-3 items-center justify-between">
-            <span className="text-[9px] uppercase font-bold tracking-wider text-indigo-400 flex items-center gap-1.5"><Layers className="w-3 h-3" /> Layers</span>
-            <button onClick={handleAddSceneLayer} className="text-[9px] text-slate-300 hover:text-white flex items-center gap-1 bg-slate-800 px-1.5 py-0.5 rounded"><PlusCircle className="w-2 h-2"/> Add</button>
+          <div className="flex h-7 bg-[#2B2C33] border-b border-[#3A3B44] shrink-0 px-3 items-center justify-between">
+            <span className="text-[9px] uppercase font-bold tracking-wider text-[#E0E0E0] flex items-center gap-1"><Layers className="w-2.5 h-2.5" /> Layers</span>
+            <button onClick={handleAddSceneLayer} className="text-[9px] text-[#888] hover:text-white flex items-center gap-0.5 bg-[#3A3B44] px-1 py-0.5 rounded"><PlusCircle className="w-2 h-2"/> Add</button>
           </div>
-          <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
+          <div className="flex-1 overflow-y-auto p-2 space-y-1">
             {[...activeLayers].reverse().map((lay) => (
-              <div key={lay.id} className={`p-2 rounded border text-left flex flex-col gap-1.5 ${
-                activeLayerId === lay.id ? 'bg-indigo-900/20 border-indigo-600/50 shadow-sm' : 'bg-slate-800/30 border-slate-800'
+              <div key={lay.id} className={`p-1.5 rounded border flex flex-col gap-1 ${
+                activeLayerId === lay.id ? 'bg-[#3A3B44] border-[#FFA000]' : 'bg-[#2B2C33] border-[#3A3B44]'
               }`}>
                 <div className="flex items-center justify-between w-full">
-                  <div className="flex items-center gap-2 text-[10px]">
-                    <button onClick={() => handleUpdateLayer(lay.id, { visible: !lay.visible })} className="text-slate-400 hover:text-indigo-300">
-                      {lay.visible ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5 text-rose-400" />}
+                  <div className="flex items-center gap-1.5 text-[10px]">
+                    <button onClick={() => handleUpdateLayer(lay.id, { visible: !lay.visible })} className="text-[#888] hover:text-[#FFA000]">
+                      {lay.visible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3 text-[#FF6B6B]" />}
                     </button>
                     <input 
                       type="text" 
                       value={lay.name} 
                       onChange={(e) => handleUpdateLayer(lay.id, { name: e.target.value })}
-                      className="bg-transparent border-none text-[10px] font-bold text-slate-200 outline-none w-20"
+                      className="bg-transparent border-none text-[10px] font-medium text-[#E0E0E0] outline-none w-16"
                     />
                   </div>
-                  <div className="flex items-center gap-1">
-                    <button onClick={() => setActiveLayerId(lay.id)} className={`text-[8px] px-1.5 py-0.5 rounded font-bold uppercase ${
-                      activeLayerId === lay.id ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  <div className="flex items-center gap-0.5">
+                    <button onClick={() => setActiveLayerId(lay.id)} className={`text-[7px] px-1 py-0.5 rounded font-bold uppercase ${
+                      activeLayerId === lay.id ? 'bg-[#FFA000] text-white' : 'bg-[#3A3B44] text-[#888] hover:bg-[#4A4B54]'
                     }`}>Sel</button>
-                    <button onClick={() => handleDeleteLayer(lay.id)} className="p-0.5 bg-rose-950/20 rounded text-rose-400 hover:bg-rose-900/30">
-                      <Trash2 className="w-3 h-3" />
+                    <button onClick={() => handleDeleteLayer(lay.id)} className="p-0.5 rounded text-[#FF6B6B] hover:bg-[#3A1A1A]">
+                      <Trash2 className="w-2.5 h-2.5" />
                     </button>
                   </div>
                 </div>

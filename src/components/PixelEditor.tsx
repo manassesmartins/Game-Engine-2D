@@ -1359,7 +1359,7 @@ export default function PixelEditor({ selectedObject, onUpdateObject }: PixelEdi
   const onionFrame = currentFrameIdx > 0 ? frames[currentFrameIdx - 1] : null;
 
   return (
-    <div className="flex-1 flex overflow-hidden bg-[#0c0d12] relative select-none" id="pixel_editor_root" onMouseUp={handleMouseDragEnd}>
+    <div className="flex-1 flex overflow-hidden bg-[#1E1F26] relative select-none" id="pixel_editor_root" onMouseUp={handleMouseDragEnd}>
       
       {/* 1. LEFT TOOLBAR: EXHILARATING SELECTION OF GRAPHIC ENGINES */}
       <div className="w-16 bg-[#161720] border-r border-[#262732] flex flex-col items-center py-3 space-y-2 overflow-y-auto shrink-0 select-none">

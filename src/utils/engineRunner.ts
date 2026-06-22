@@ -3,7 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { GameProject, ProjectObject, ObjectInstance, EventBlock, ConditionType, ActionType, EventAction, SceneLayer } from '../types';
+import { GameProject, ProjectObject, ObjectInstance, EventBlock, ConditionType, ActionType, EventAction, SceneLayer, TileDef } from '../types';
+
+const RUNTIME_TILE_DEFS: TileDef[] = [
+  { id: 1, color: '#10b981', solid: true, name: 'Grama' },
+  { id: 2, color: '#0ea5e9', solid: false, name: 'Água (Fluída)' },
+  { id: 3, color: '#d97706', solid: true, name: 'Tijolo Sólido' },
+  { id: 4, color: '#ef4444', solid: true, name: 'Lava Aquecida' }
+];
 
 interface LiveInstance extends ObjectInstance {
   vx: number;
@@ -553,19 +560,32 @@ export class EngineRunner {
       const minRow = Math.floor(y / gs);
       const maxRow = Math.ceil((y + h) / gs);
 
-      for (let r = minRow; r <= maxRow; r++) {
-        for (let c = minCol; c <= maxCol; c++) {
-          const val = scene.tilemap.grid[`${c},${r}`];
-          if (val && val !== 2) { // solid grass/tiles
-            const tLeft = c * gs;
-            const tRight = (c+1) * gs;
-            const tTop = r * gs;
-            const tBottom = (r+1) * gs;
-
-            if (x + w > tLeft && x < tRight && y + h > tTop && y < tBottom) {
-              return true;
+      const checkGrid = (grid: Record<string, number | string>) => {
+        for (let r = minRow; r <= maxRow; r++) {
+          for (let c = minCol; c <= maxCol; c++) {
+            const val = grid[`${c},${r}`];
+            if (val !== undefined && val !== null) {
+              const tid = typeof val === 'string' ? parseInt(val) : val;
+              const def = RUNTIME_TILE_DEFS.find(t => t.id === tid);
+              if (def && def.solid) {
+                const tLeft = c * gs;
+                const tRight = (c+1) * gs;
+                const tTop = r * gs;
+                const tBottom = (r+1) * gs;
+                if (x + w > tLeft && x < tRight && y + h > tTop && y < tBottom) {
+                  return true;
+                }
+              }
             }
           }
+        }
+        return false;
+      };
+
+      if (scene.tilemap && scene.tilemap.grid && checkGrid(scene.tilemap.grid)) return true;
+      if (scene.tilemaps) {
+        for (const tm of scene.tilemaps) {
+          if (checkGrid(tm.grid)) return true;
         }
       }
     }
@@ -595,7 +615,7 @@ export class EngineRunner {
 
     // Check tilemap solids
     const gs = scene.gridSize;
-    if (scene.tilemap && scene.tilemap.grid) {
+    const checkGrid = (grid: Record<string, number | string>) => {
       const minCol = Math.floor(inst.x / gs);
       const maxCol = Math.ceil((inst.x + inst.width) / gs);
       const minRow = Math.floor(inst.y / gs);
@@ -603,24 +623,34 @@ export class EngineRunner {
 
       for (let r = minRow; r <= maxRow; r++) {
         for (let c = minCol; c <= maxCol; c++) {
-          const val = scene.tilemap.grid[`${c},${r}`];
-          const isTileSolid = val === 1 || val === 3;
-          if (val !== undefined && isTileSolid) {
-            const tileLeft = c * gs;
-            const tileRight = (c + 1) * gs;
-            const tileTop = r * gs;
-            const tileBottom = (r + 1) * gs;
-
-            if (
-              inst.x + inst.width > tileLeft &&
-              inst.x < tileRight &&
-              inst.y + inst.height > tileTop &&
-              inst.y < tileBottom
-            ) {
-              return true;
+          const val = grid[`${c},${r}`];
+          if (val !== undefined && val !== null) {
+            const tid = typeof val === 'string' ? parseInt(val) : (val as number);
+            const def = RUNTIME_TILE_DEFS.find(t => t.id === tid);
+            if (def && def.solid) {
+              const tileLeft = c * gs;
+              const tileRight = (c + 1) * gs;
+              const tileTop = r * gs;
+              const tileBottom = (r + 1) * gs;
+              if (
+                inst.x + inst.width > tileLeft &&
+                inst.x < tileRight &&
+                inst.y + inst.height > tileTop &&
+                inst.y < tileBottom
+              ) {
+                return true;
+              }
             }
           }
         }
+      }
+      return false;
+    };
+
+    if (scene.tilemap && scene.tilemap.grid && checkGrid(scene.tilemap.grid)) return true;
+    if (scene.tilemaps) {
+      for (const tm of scene.tilemaps) {
+        if (checkGrid(tm.grid)) return true;
       }
     }
     return false;
@@ -684,8 +714,8 @@ export class EngineRunner {
       }
     });
 
-    // Check tilemap layer solids
-    if (tilemap && tilemap.grid) {
+    // Check tilemap layer solids (from both single and multiple tilemaps)
+    const resolveGrid = (grid: Record<string, number | string>) => {
       const minCol = Math.floor(instLeft / gs);
       const maxCol = Math.ceil(instRight / gs);
       const minRow = Math.floor(instTop / gs);
@@ -693,12 +723,12 @@ export class EngineRunner {
 
       for (let r = minRow; r <= maxRow; r++) {
         for (let c = minCol; c <= maxCol; c++) {
-          const tileVal = tilemap.grid[`${c},${r}`];
-          // Tile types: 1=Grass (Solid), 3=Tijolo (Solid), 4=Lava
-          // Paint 2=Water (not solid)
-          const isTileSolid = tileVal === 1 || tileVal === 3;
-          
-          if (tileVal !== undefined && isTileSolid) {
+          const tileVal = grid[`${c},${r}`];
+          if (tileVal !== undefined && tileVal !== null) {
+            const tid = typeof tileVal === 'string' ? parseInt(tileVal) : (tileVal as number);
+            const def = RUNTIME_TILE_DEFS.find(t => t.id === tid);
+            if (!def || !def.solid) continue;
+
             const tileLeft = c * gs;
             const tileRight = (c + 1) * gs;
             const tileTop = r * gs;
@@ -726,6 +756,13 @@ export class EngineRunner {
             }
           }
         }
+      }
+    };
+
+    if (tilemap && tilemap.grid) resolveGrid(tilemap.grid);
+    if (scene.tilemaps) {
+      for (const tm of scene.tilemaps) {
+        resolveGrid(tm.grid);
       }
     }
   }
@@ -1174,11 +1211,15 @@ export class EngineRunner {
       camY = scrollTarget.y + scrollTarget.height / 2;
     }
 
-    // Clamp camera within layout boundaries
+    // Clamp camera within layout boundaries (handles layouts smaller and larger than viewport)
     const halfW = this.canvas.width / 2;
     const halfH = this.canvas.height / 2;
-    camX = Math.max(halfW, Math.min(scene.width - halfW, camX));
-    camY = Math.max(halfH, Math.min(scene.height - halfH, camY));
+    const minCamX = Math.min(halfW, scene.width / 2);
+    const maxCamX = Math.max(halfW, scene.width - halfW);
+    const minCamY = Math.min(halfH, scene.height / 2);
+    const maxCamY = Math.max(halfH, scene.height - halfH);
+    camX = Math.max(minCamX, Math.min(maxCamX, camX));
+    camY = Math.max(minCamY, Math.min(maxCamY, camY));
 
     // Save camera center coordinates
     this.cameraX = camX;
@@ -1220,37 +1261,40 @@ export class EngineRunner {
       }
 
       // Draw Tiles (for interactive ground maps)
-      if (lay.id === 'default_lay' || lay.name.toLowerCase().includes('main') || lay.name.toLowerCase().includes('principal')) {
-        const tilemap = scene.tilemap;
-        if (tilemap && tilemap.grid) {
-          Object.entries(tilemap.grid).forEach(([coords, tileType]) => {
-            const [col, row] = coords.split(',').map(Number);
-            const x = col * gs;
-            const y = row * gs;
+      const drawTileGrid = (grid: Record<string, number | string>) => {
+        if (!grid) return;
+        Object.entries(grid).forEach(([coords, tileType]) => {
+          const [col, row] = coords.split(',').map(Number);
+          const x = col * gs;
+          const y = row * gs;
+          const tid = typeof tileType === 'string' ? parseInt(tileType) : (tileType as number);
+          const def = RUNTIME_TILE_DEFS.find(t => t.id === tid);
+          if (!def) return;
 
-            // Custom tile types rendering
-            if (tileType === 1) { // Grass
-              this.ctx.fillStyle = '#10b981';
-              this.ctx.fillRect(x, y, gs, gs);
-              this.ctx.fillStyle = '#059669';
-              this.ctx.fillRect(x, y, gs, 6);
-            } else if (tileType === 2) { // Water (Water Distort simulation)
-              const waveOff = Math.sin(this.globalTime * 6 + col) * 3;
-              this.ctx.fillStyle = '#0ea5e9';
-              this.ctx.fillRect(x, y + waveOff / 3, gs, gs);
-            } else if (tileType === 3) { // Brick/Obstacle
-              this.ctx.fillStyle = '#d97706';
-              this.ctx.fillRect(x, y, gs, gs);
-              this.ctx.strokeStyle = '#92400e';
-              this.ctx.lineWidth = 1;
-              this.ctx.strokeRect(x, y, gs, gs);
-            } else if (tileType === 4) { // Lava
-              const lavaPulse = 10 + Math.sin(this.globalTime * 8) * 4;
-              this.ctx.fillStyle = `rgb(${220 + lavaPulse}, 38, 38)`;
-              this.ctx.fillRect(x, y, gs, gs);
-            }
-          });
-        }
+          if (def.id === 2) {
+            const waveOff = Math.sin(this.globalTime * 6 + col) * 3;
+            this.ctx.fillStyle = def.color;
+            this.ctx.fillRect(x, y + waveOff / 3, gs, gs);
+          } else if (def.id === 4) {
+            const lavaPulse = 10 + Math.sin(this.globalTime * 8) * 4;
+            this.ctx.fillStyle = `rgb(${220 + lavaPulse}, 38, 38)`;
+            this.ctx.fillRect(x, y, gs, gs);
+          } else {
+            this.ctx.fillStyle = def.color;
+            this.ctx.fillRect(x, y, gs, gs);
+          }
+          if (def.solid) {
+            this.ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+            this.ctx.lineWidth = 0.5;
+            this.ctx.strokeRect(x, y, gs, gs);
+          }
+        });
+      };
+
+      // Draw all tilemaps for this layer
+      if (scene.tilemap && scene.tilemap.grid) drawTileGrid(scene.tilemap.grid);
+      if (scene.tilemaps) {
+        scene.tilemaps.forEach(tm => drawTileGrid(tm.grid));
       }
 
       // Draw active Sprite instances for this layer

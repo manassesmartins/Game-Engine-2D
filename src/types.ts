@@ -106,6 +106,7 @@ export interface Scene {
   gridSize: number;
   instances: ObjectInstance[];
   tilemap: TileMapLayer;
+  tilemaps: TileMapLayer[];
   layers: SceneLayer[];
 }
 

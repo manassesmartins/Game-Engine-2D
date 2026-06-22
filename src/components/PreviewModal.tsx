@@ -72,26 +72,25 @@ export default function PreviewModal({ project, onClose }: PreviewModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md flex items-stretch justify-stretch z-50 p-6 overflow-hidden animate-in fade-induration-150" id="preview_modal_screen">
+    <div className="fixed inset-0 bg-[#1E1F26]/95 flex items-stretch justify-stretch z-50 p-4 overflow-hidden" id="preview_modal_screen">
       
-      {/* Dynamic preview content split */}
-      <div className="flex-1 flex flex-col md:flex-row gap-6 max-w-7xl mx-auto w-full">
+      <div className="flex-1 flex flex-col md:flex-row gap-4 max-w-7xl mx-auto w-full">
         
         {/* RUNNING STAGE CONTAINER */}
-        <div className="flex-1 flex flex-col justify-stretch bg-[#111218] border border-slate-800 rounded-2xl relative shadow-2xl p-4 overflow-hidden">
+        <div className="flex-1 flex flex-col justify-stretch bg-[#2B2C33] border border-[#3A3B44] rounded relative shadow-lg p-3 overflow-hidden">
           
           {/* Controls Bar */}
-          <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
+          <div className="flex items-center justify-between mb-3 border-b border-[#3A3B44] pb-2">
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span className="text-xs font-bold font-mono text-emerald-400">EXECUTADOR SANDBOX LIVE</span>
+              <span className="w-2 h-2 rounded-full bg-[#FFA000] animate-pulse"></span>
+              <span className="text-xs font-bold text-[#E0E0E0]">PREVIEW</span>
             </div>
 
             <div className="flex items-center gap-2">
               <button
                 onClick={handleTogglePause}
-                className={`text-xs px-3 py-1.5 rounded-lg font-bold transition-all active:scale-95 ${
-                  isPaused ? 'bg-emerald-600 text-white' : 'bg-amber-600 text-white'
+                className={`text-xs px-2.5 py-1 rounded font-medium transition-all active:scale-95 ${
+                  isPaused ? 'bg-[#FFA000] text-white' : 'bg-[#3A3B44] text-[#E0E0E0]'
                 }`}
               >
                 {isPaused ? 'Resumir' : 'Pausar'}
@@ -99,52 +98,52 @@ export default function PreviewModal({ project, onClose }: PreviewModalProps) {
 
               <button
                 onClick={handleRestart}
-                className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1 active:scale-95 transition-all border border-slate-700"
+                className="text-xs bg-[#3A3B44] hover:bg-[#4A4B54] text-[#E0E0E0] px-2.5 py-1 rounded font-medium flex items-center gap-1 active:scale-95 transition-all border border-[#4A4B54]"
               >
-                <RotateCcw className="w-3.5 h-3.5" /> Reiniciar
+                <RotateCcw className="w-3 h-3" /> Reiniciar
               </button>
             </div>
           </div>
 
           {/* Actual Active Canvas stage */}
-          <div className="flex-1 flex items-center justify-center p-3 relative bg-[#07080b] rounded-xl border border-slate-900 overflow-hidden">
+          <div className="flex-1 flex items-center justify-center p-2 relative bg-[#1E1F26] rounded border border-[#3A3B44] overflow-hidden">
             <canvas
               ref={canvasRef}
               width={800}
               height={600}
-              className="max-w-full max-h-full rounded shadow-lg bg-[#181924] block"
+              className="max-w-full max-h-full rounded shadow bg-[#23242B] block"
               id="live_physics_stage"
             />
           </div>
         </div>
 
         {/* LOG DEBUGGER SIDE PANEL */}
-        <div className="w-full md:w-80 bg-[#161720] border border-slate-800 rounded-2xl flex flex-col p-4 shadow-xl">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-3">
-            <span className="text-xs font-bold text-slate-400 tracking-wider flex items-center gap-1.5 uppercase font-mono">
-              <AlertCircle className="w-4 h-4 text-indigo-400" /> Console de Debug (Logs)
+        <div className="w-full md:w-72 bg-[#26272E] border border-[#3A3B44] rounded flex flex-col p-3 shadow">
+          <div className="flex items-center justify-between border-b border-[#3A3B44] pb-2 mb-2">
+            <span className="text-xs font-bold text-[#E0E0E0] tracking-wider flex items-center gap-1.5 uppercase">
+              <AlertCircle className="w-3.5 h-3.5 text-[#FFA000]" /> Logs
             </span>
             <button
               onClick={onClose}
-              className="p-1 hover:bg-rose-950/20 text-rose-400 rounded-lg transition-colors border border-transparent hover:border-slate-805"
+              className="p-0.5 hover:bg-[#3A1A1A] text-[#FF6B6B] rounded"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
           </div>
 
           {/* Log lists stream */}
-          <div className="flex-1 overflow-y-auto space-y-1.5 font-mono text-[10px] leading-relaxed pr-1" id="debugger_console_output">
+          <div className="flex-1 overflow-y-auto space-y-1 text-[10px] leading-relaxed pr-1" id="debugger_console_output">
             {logs.length === 0 ? (
-              <span className="text-gray-500 italic p-3 block text-center">Nenhum evento registrado ainda.</span>
+              <span className="text-[#666] italic p-2 block text-center">Nenhum evento registrado.</span>
             ) : (
               logs.map((log, idx) => {
-                let colorClass = 'text-gray-400';
-                if (log.includes('Erro')) colorClass = 'text-rose-400 font-semibold';
-                if (log.includes('Iniciado')) colorClass = 'text-emerald-400';
-                if (log.includes('Variável')) colorClass = 'text-indigo-300';
+                let colorClass = 'text-[#888]';
+                if (log.includes('Erro')) colorClass = 'text-[#FF6B6B] font-medium';
+                if (log.includes('Iniciado')) colorClass = 'text-[#4CAF50]';
+                if (log.includes('Variável')) colorClass = 'text-[#FFA000]';
                 
                 return (
-                  <div key={idx} className={`p-1.5 bg-[#1a1b24] rounded border border-slate-800/40 ${colorClass}`}>
+                  <div key={idx} className={`p-1 bg-[#2B2C33] rounded border border-[#3A3B44]/50 ${colorClass}`}>
                     {log}
                   </div>
                 );
@@ -152,10 +151,10 @@ export default function PreviewModal({ project, onClose }: PreviewModalProps) {
             )}
           </div>
 
-          <div className="bg-[#1e1f2b] p-3 rounded-lg mt-3 border border-slate-850">
-            <span className="text-[10px] text-indigo-400 font-bold block mb-0.5">Como Testar:</span>
-            <p className="text-[9px] text-gray-400 leading-normal">
-              Utilize as setas do teclado ou WSAD para movimentar personagens que possuam comportamentos ativos. Clique em personagens com gatilhos programados.
+          <div className="bg-[#2B2C33] p-2 rounded mt-2 border border-[#3A3B44]">
+            <span className="text-[10px] text-[#FFA000] font-medium block mb-0.5">Como Testar:</span>
+            <p className="text-[9px] text-[#888] leading-normal">
+              Use setas ou WASD para mover. Clique em objetos com gatilhos.
             </p>
           </div>
         </div>

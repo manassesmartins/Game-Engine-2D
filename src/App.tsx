@@ -159,13 +159,20 @@ const INITIAL_PROJECT: GameProject = {
           layerId: 'layer_main'
         }
       ],
+      tilemaps: [
+        {
+          id: 'layer_ground',
+          name: 'Chão Sólido',
+          grid: {
+            '0,15': 1, '1,15': 1, '2,15': 1, '3,15': 1, '4,15': 1, '5,15': 1, '6,15': 3, '7,15': 3, '8,15': 3, '9,15': 3, '10,15': 1, '11,15': 1, '12,15': 1, '13,15': 1, '14,15': 1, '15,15': 1, '16,15': 1, '17,15': 1, '18,15': 1, '19,15': 1, '20,15': 1, '21,15': 1, '22,15': 1, '23,15': 1, '24,15': 1,
+            '10,11': 3, '11,11': 3, '12,11': 3, '13,11': 3,
+          }
+        }
+      ],
       tilemap: {
         id: 'layer_ground',
         name: 'Chão Sólido',
-        grid: {
-          '0,15': 1, '1,15': 1, '2,15': 1, '3,15': 1, '4,15': 1, '5,15': 1, '6,15': 3, '7,15': 3, '8,15': 3, '9,15': 3, '10,15': 1, '11,15': 1, '12,15': 1, '13,15': 1, '14,15': 1, '15,15': 1, '16,15': 1, '17,15': 1, '18,15': 1, '19,15': 1, '20,15': 1, '21,15': 1, '22,15': 1, '23,15': 1, '24,15': 1,
-          '10,11': 3, '11,11': 3, '12,11': 3, '13,11': 3,
-        }
+        grid: {}
       }
     }
   ],
@@ -388,35 +395,35 @@ export default function App() {
   const currentScene = project.scenes.find(s => s.id === project.currentSceneId) || project.scenes[0];
 
   return (
-    <div className="h-screen w-screen flex flex-col justify-stretch bg-[#090a0f] text-slate-100 overflow-hidden select-none font-sans" id="studio_shell_container">
+    <div className="h-screen w-screen flex flex-col justify-stretch bg-[#1E1F26] text-[#E0E0E0] overflow-hidden select-none font-sans" id="studio_shell_container">
       
-      {/* MASTER TOP APPLICATION BAR */}
-      <header className="h-14 bg-[#111218] border-b border-[#252632] px-6 flex items-center justify-between z-10 shrink-0">
+      {/* MASTER TOP APPLICATION BAR - Construct 3 style */}
+      <header className="h-12 bg-[#2B2C33] border-b border-[#3A3B44] px-4 flex items-center justify-between z-10 shrink-0">
         
         {/* Brand */}
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-white shadow-md text-lg">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded bg-[#FFA000] flex items-center justify-center font-bold text-white shadow-sm text-sm">
             C
           </div>
           <div>
-            <h1 className="text-sm font-bold text-slate-100 flex items-center gap-1.5">
-              Constructo 2D Studio <span className="text-[9px] bg-indigo-950 text-indigo-400 font-mono px-2 py-0.5 rounded-full border border-indigo-900/60">No-Code</span>
+            <h1 className="text-xs font-bold text-[#E0E0E0] flex items-center gap-1.5">
+              Constructo 2D Studio
             </h1>
             <input
               type="text"
               value={project.name}
               onChange={(e) => setProject({ ...project, name: e.target.value })}
-              className="text-[10px] text-gray-400 bg-transparent outline-none focus:underline font-medium p-0"
+              className="text-[9px] text-[#888] bg-transparent outline-none focus:underline font-medium p-0 leading-none"
               title="Clique para renomear"
             />
           </div>
         </div>
 
         {/* Studio quick action controls */}
-        <div className="flex items-center gap-3.5">
+        <div className="flex items-center gap-2">
           
-          <label className="text-[10px] text-slate-400 hover:text-white bg-slate-850/60 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 py-1.5 px-3 rounded-lg cursor-pointer flex items-center gap-1.5 font-bold transition-all transition-colors select-none">
-            <FolderOpen className="w-3.5 h-3.5" /> Abrir Projeto
+          <label className="text-[10px] text-[#A0A0A0] hover:text-white bg-[#3A3B44] hover:bg-[#4A4B54] border border-[#4A4B54] hover:border-[#5A5B64] py-1 px-2.5 rounded cursor-pointer flex items-center gap-1.5 font-medium transition-all select-none">
+            <FolderOpen className="w-3 h-3" /> Abrir
             <input 
               type="file" 
               accept=".json" 
@@ -427,19 +434,19 @@ export default function App() {
 
           <button
             onClick={handleSaveProjectLocal}
-            className="text-[10px] text-slate-400 hover:text-white bg-slate-850/60 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 py-1.5 px-3 rounded-lg cursor-pointer flex items-center gap-1.5 font-bold transition-all"
+            className="text-[10px] text-[#A0A0A0] hover:text-white bg-[#3A3B44] hover:bg-[#4A4B54] border border-[#4A4B54] hover:border-[#5A5B64] py-1 px-2.5 rounded cursor-pointer flex items-center gap-1.5 font-medium transition-all"
           >
-            <Save className="w-3.5 h-3.5" /> Salvar Projeto
+            <Save className="w-3 h-3" /> Salvar
           </button>
 
-          <div className="h-5 w-[1px] bg-slate-800"></div>
+          <div className="h-4 w-[1px] bg-[#3A3B44]"></div>
 
           {/* RUN SIMULATOR BUTTON */}
           <button
             onClick={() => setIsPreviewing(true)}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg py-1.8 px-5 text-xs font-bold transition-all active:scale-95 shadow-md flex items-center gap-1.5 select-none cursor-pointer"
+            className="bg-[#FFA000] hover:bg-[#FFB300] text-white rounded py-1.5 px-4 text-xs font-bold transition-all active:scale-95 shadow-sm flex items-center gap-1.5 select-none cursor-pointer"
           >
-            <Play className="w-4 h-4 fill-current" /> Jogar Preview (Live)
+            <Play className="w-3.5 h-3.5 fill-current" /> Preview
           </button>
         </div>
       </header>
@@ -447,85 +454,36 @@ export default function App() {
       {/* BOTTOM WORKSPACE ZONE */}
       <div className="flex-1 flex overflow-hidden">
         
-        {/* SIDE MENU BAR TABS */}
-        <nav className="w-20 bg-[#111218] border-r border-[#252632] flex flex-col justify-stretch items-center py-4 space-y-6 shrink-0">
+        {/* SIDE MENU BAR TABS - Construct 3 style vertical toolbar */}
+        <nav className="w-[52px] bg-[#2B2C33] border-r border-[#3A3B44] flex flex-col items-center py-3 gap-1 shrink-0">
           
-          <button
-            onClick={() => setActiveTab('layout')}
-            className={`w-14 h-14 rounded-xl flex flex-col items-center justify-center gap-1.5 transition-all select-none ${
-              activeTab === 'layout'
-                ? 'bg-indigo-600/10 border border-indigo-500/60 text-indigo-400 shadow-sm'
-                : 'text-gray-400 hover:text-slate-100 hover:bg-slate-900/30 border border-transparent'
-            }`}
-          >
-            <Layout className="w-5 h-5" />
-            <span className="text-[8px] font-bold">Cenas</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('events')}
-            className={`w-14 h-14 rounded-xl flex flex-col items-center justify-center gap-1.5 transition-all select-none ${
-              activeTab === 'events'
-                ? 'bg-indigo-600/10 border border-indigo-500/60 text-indigo-400 shadow-sm'
-                : 'text-gray-400 hover:text-slate-100 hover:bg-slate-900/30 border border-transparent'
-            }`}
-          >
-            <Calendar className="w-5 h-5" />
-            <span className="text-[8px] font-bold">Eventos</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('pixel')}
-            className={`w-14 h-14 rounded-xl flex flex-col items-center justify-center gap-1.5 transition-all select-none ${
-              activeTab === 'pixel'
-                ? 'bg-indigo-600/10 border border-indigo-500/60 text-indigo-400 shadow-sm'
-                : 'text-gray-400 hover:text-slate-100 hover:bg-slate-900/30 border border-transparent'
-            }`}
-          >
-            <Sparkles className="w-5 h-5" />
-            <span className="text-[8px] font-bold">Pixel Art</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('audio')}
-            className={`w-14 h-14 rounded-xl flex flex-col items-center justify-center gap-1.5 transition-all select-none ${
-              activeTab === 'audio'
-                ? 'bg-indigo-600/10 border border-indigo-500/60 text-indigo-400 shadow-sm'
-                : 'text-gray-400 hover:text-slate-100 hover:bg-slate-900/30 border border-transparent'
-            }`}
-          >
-            <Music className="w-5 h-5" />
-            <span className="text-[8px] font-bold">Som/Música</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('library')}
-            className={`w-14 h-14 rounded-xl flex flex-col items-center justify-center gap-1.5 transition-all select-none ${
-              activeTab === 'library'
-                ? 'bg-indigo-600/10 border border-indigo-500/60 text-indigo-400 shadow-sm'
-                : 'text-gray-400 hover:text-slate-100 hover:bg-slate-900/30 border border-transparent'
-            }`}
-          >
-            <Layers className="w-5 h-5" />
-            <span className="text-[8px] font-bold">Assets</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('export')}
-            className={`w-14 h-14 rounded-xl flex flex-col items-center justify-center gap-1.5 transition-all select-none ${
-              activeTab === 'export'
-                ? 'bg-indigo-600/10 border border-indigo-500/60 text-indigo-400 shadow-sm'
-                : 'text-gray-400 hover:text-slate-100 hover:bg-slate-900/30 border border-transparent'
-            }`}
-          >
-            <Package className="w-5 h-5" />
-            <span className="text-[8px] font-bold">Exportar</span>
-          </button>
+          {[
+            { id: 'layout' as const, icon: Layout, label: 'Cenas' },
+            { id: 'events' as const, icon: Calendar, label: 'Eventos' },
+            { id: 'pixel' as const, icon: Sparkles, label: 'Pixel' },
+            { id: 'audio' as const, icon: Music, label: 'Áudio' },
+            { id: 'library' as const, icon: Layers, label: 'Assets' },
+            { id: 'export' as const, icon: Package, label: 'Exportar' },
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`w-[44px] h-[44px] rounded-lg flex flex-col items-center justify-center gap-0.5 transition-all select-none ${
+                activeTab === tab.id
+                  ? 'bg-[#FFA000] text-white shadow-sm'
+                  : 'text-[#888] hover:text-[#E0E0E0] hover:bg-[#3A3B44]'
+              }`}
+              title={tab.label}
+            >
+              <tab.icon className="w-4 h-4" />
+              <span className="text-[7px] font-bold leading-none">{tab.label}</span>
+            </button>
+          ))}
 
         </nav>
 
         {/* WORKSPACE CENTRAL DISPATCHER CONTROL VIEWPORT */}
-        <main className="flex-1 flex overflow-hidden bg-[#090a0f]">
+        <main className="flex-1 flex overflow-hidden bg-[#1E1F26]">
           {activeTab === 'layout' && (
             <SceneEditor
               scene={currentScene}
