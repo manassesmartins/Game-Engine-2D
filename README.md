@@ -231,7 +231,7 @@ Distribuído sob licença **Apache 2.0**. Veja [LICENSE](LICENSE) para mais info
 ---
 
 <div align="center">
-  <sub>Feito com 💙 por <a href="https://github.com/seu-usuario">@seu-usuario</a></sub>
+  <sub>Feito com ❤️ por <a href="https://github.com/manassesmartins">manassesmartins</a></sub>
   <br />
-  <sub>Inspirado por <a href="https://www.construct.net">Construct 3</a> da Scirra Ltd.</sub>
+  <sub>Inspirado no <a href="https://www.construct.net">Construct 3</a> da Scirra Ltd.</sub>
 </div>
