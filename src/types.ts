@@ -1,22 +1,17 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 export type ObjectType = 'sprite' | 'tilemap' | 'hud' | 'dictionary' | 'array';
 
 export interface SpriteFrame {
   id: string;
   width: number;
   height: number;
-  pixels: string[]; // Flat 1D array of colors (hex or transparent "")
+  pixels: string[];
 }
 
 export interface SpriteAnimation {
   id: string;
   name: string;
-  frames: string[]; // SpriteFrame IDs
-  speed: number; // FPS
+  frames: string[];
+  speed: number;
   loop: boolean;
 }
 
@@ -24,13 +19,12 @@ export interface ProjectObject {
   id: string;
   name: string;
   type: ObjectType;
-  primaryColor: string; // fallback color
+  primaryColor: string;
   frames: SpriteFrame[];
   animations: SpriteAnimation[];
-  currentAnimation: string; // Animation ID
-  behaviors: string[]; // 'Platform' | '8Direction' | 'Car' | 'Bullet' | 'Solid' | 'JumpThru' | 'BoundToLayout' | 'ScrollTo' | 'Flash' | 'Fade' | 'Timer' | 'Pin' | 'Physics' | 'Pathfinding'
+  currentAnimation: string;
+  behaviors: string[];
   properties: {
-    // Platform variables
     speed?: number;
     acceleration?: number;
     deceleration?: number;
@@ -38,20 +32,16 @@ export interface ProjectObject {
     doubleJump?: boolean;
     gravity?: number;
     maxSpeed?: number;
-    // Car variables
     carSpeed?: number;
     carAcceleration?: number;
     carDeceleration?: number;
     carTurnSpeed?: number;
     carDriftFactor?: number;
-    // Bullet variables
     bulletSpeed?: number;
     bulletAcceleration?: number;
     bulletGravity?: number;
-    // Sine variables
     sineAmplitude?: number;
     sinePeriod?: number;
-    // Timer & General
     flashDuration?: number;
     fadeDuration?: number;
     timerValue?: number;
@@ -68,7 +58,7 @@ export interface TileDef {
 export interface TileMapLayer {
   id: string;
   name: string;
-  grid: Record<string, number | string>; // "x,y": TileDef ID or "objId:frameIdx"
+  grid: Record<string, number | string>;
 }
 
 export interface SceneLayer {
@@ -82,18 +72,18 @@ export interface SceneLayer {
 
 export interface ObjectInstance {
   id: string;
-  objectTypeId: string; // Reference to ProjectObject
+  objectTypeId: string;
   x: number;
   y: number;
   width: number;
   height: number;
-  angle: number; // degrees
-  opacity: number; // 0 to 1
+  angle: number;
+  opacity: number;
   variables: Record<string, number | string>;
-  layerId?: string; // Reference to SceneLayer ID
-  originX?: number; // 0 to 1 (default 0.5)
-  originY?: number; // 0 to 1 (default 0.5)
-  collisionPolygon?: [number, number][]; // Offset points relative to top-left [x, y]
+  layerId?: string;
+  originX?: number;
+  originY?: number;
+  collisionPolygon?: [number, number][];
   blendMode?: 'normal' | 'add' | 'multiply' | 'screen';
   effectFilter?: 'none' | 'grayscale' | 'sepia' | 'blur' | 'glow' | 'water' | 'shockwave' | 'warp';
 }
@@ -113,24 +103,46 @@ export interface Scene {
 export type ConditionType =
   | 'system_onload'
   | 'system_tick'
+  | 'every_x_seconds'
+  | 'every_x_ticks'
+  | 'trigger_once'
   | 'keyboard_keypress'
   | 'keyboard_keyholding'
+  | 'keyboard_keyrelease'
   | 'mouse_click'
+  | 'mouse_cursor_on_object'
   | 'object_collision'
   | 'object_click'
+  | 'object_distance'
+  | 'object_count_compare'
   | 'timer_elapsed'
+  | 'animation_finished'
   | 'function_called'
-  | 'gesture_touch';
+  | 'gesture_touch'
+  | 'global_var_compare'
+  | 'instance_var_compare'
+  | 'compare_dictionary_value'
+  | 'array_compare_at_index'
+  | 'else_condition'
+  | 'always'
+  | 'pick_random_instance'
+  | 'pick_nearest'
+  | 'pick_farthest'
+  | 'double_jump_available'
+  | 'is_on_floor';
 
 export interface EventCondition {
   id: string;
   type: ConditionType;
-  param1?: string; // e.g. key name, object type, function name
-  param2?: string; // e.g. target object type, collision object type
+  param1?: string;
+  param2?: string;
+  param3?: string;
+  negation?: boolean;
 }
 
 export type ActionType =
   | 'object_move'
+  | 'object_move_to'
   | 'object_set_pos'
   | 'object_spawn'
   | 'object_destroy'
@@ -139,22 +151,51 @@ export type ActionType =
   | 'object_set_opacity'
   | 'object_set_filter'
   | 'object_set_blend'
+  | 'object_set_visible'
+  | 'object_set_animation'
+  | 'object_set_frame'
+  | 'object_set_size'
   | 'object_flash'
   | 'object_fade'
+  | 'object_pin'
+  | 'object_unpin'
   | 'play_sound'
+  | 'play_music'
+  | 'stop_music'
   | 'system_set_variable'
   | 'system_add_variable'
+  | 'system_sub_variable'
+  | 'set_instance_variable'
   | 'call_function'
   | 'dictionary_set'
   | 'array_push'
-  | 'timer_start';
+  | 'array_pop'
+  | 'array_insert'
+  | 'array_remove'
+  | 'array_set'
+  | 'array_clear'
+  | 'timer_start'
+  | 'wait'
+  | 'go_to_layout'
+  | 'restart_layout'
+  | 'next_layout'
+  | 'set_camera_position'
+  | 'scroll_to_object'
+  | 'shake_camera'
+  | 'log_message'
+  | 'broadcast_function'
+  | 'set_gravity'
+  | 'set_velocity'
+  | 'apply_force';
 
 export interface EventAction {
   id: string;
   type: ActionType;
-  targetObjectId?: string; // Which objecttype the action applies to
-  param1?: string; // custom params (key, function name, asset name, X, var name)
-  param2?: string; // custom params (value, Y, volume, timer seconds)
+  targetObjectId?: string;
+  param1?: string;
+  param2?: string;
+  param3?: string;
+  param4?: string;
 }
 
 export interface EventBlock {
@@ -162,8 +203,11 @@ export interface EventBlock {
   conditions: EventCondition[];
   actions: EventAction[];
   collapsed?: boolean;
-  subEvents?: EventBlock[]; // Nested child conditions
-  localVars?: Record<string, number | string>; // localized variables
+  disabled?: boolean;
+  comment?: string;
+  subEvents?: EventBlock[];
+  elseEvents?: EventBlock[];
+  localVars?: Record<string, number | string>;
   isFunction?: boolean;
   funcName?: string;
 }
@@ -178,15 +222,15 @@ export interface SoundPreset {
   decay: number;
   sustain: number;
   release: number;
-  cropStart?: number; // Crop parameter to slice sounds directly in engine
-  cropEnd?: number;   // Crop parameter 
+  cropStart?: number;
+  cropEnd?: number;
 }
 
 export interface MusicTrack {
   id: string;
   name: string;
   bpm: number;
-  notes: Record<string, string>; // "trackNumber:stepNumber": "C4", "E4", "G4"
+  notes: Record<string, string>;
   tempoLimit?: number;
 }
 
@@ -198,7 +242,7 @@ export interface ScriptFile {
 }
 
 export interface TimelineKeyframe {
-  time: number; // time offset in seconds
+  time: number;
   x?: number;
   y?: number;
   angle?: number;
@@ -211,12 +255,11 @@ export interface TimelineSequence {
   name: string;
   targetInstanceId: string;
   keyframes: TimelineKeyframe[];
-  duration: number; // total animation time in seconds
+  duration: number;
   loop: boolean;
   playing?: boolean;
 }
 
-// Memory repositories modeling construct 3 Dictionary and Array layout nodes
 export interface DictionaryPluginData {
   id: string;
   name: string;
@@ -242,4 +285,13 @@ export interface GameProject {
   timelines: TimelineSequence[];
   dictionaries: DictionaryPluginData[];
   arrays: ArrayPluginData[];
+}
+
+export interface GameTemplate {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  category: 'platformer' | 'rpg' | 'puzzle' | 'arcade' | 'board' | 'blank';
+  project: GameProject;
 }

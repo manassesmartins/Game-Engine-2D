@@ -17,6 +17,7 @@ interface EventSheetEditorProps {
   events: EventBlock[];
   objects: ProjectObject[];
   sounds: SoundPreset[];
+  music: MusicTrack[];
   globalVariables: Record<string, number>;
   onUpdateEvents: (updatedEvents: EventBlock[]) => void;
   onUpdateGlobalVars: (updatedVars: Record<string, number>) => void;
@@ -34,6 +35,7 @@ export default function EventSheetEditor({
   events,
   objects,
   sounds,
+  music,
   globalVariables,
   onUpdateEvents,
   onUpdateGlobalVars,
@@ -79,11 +81,14 @@ export default function EventSheetEditor({
   const [selectedCondType, setSelectedCondType] = useState<ConditionType>('keyboard_keypress');
   const [condParam1, setCondParam1] = useState<string>('ArrowRight');
   const [condParam2, setCondParam2] = useState<string>('');
+  const [condParam3, setCondParam3] = useState<string>('');
 
   const [selectedActType, setSelectedActType] = useState<ActionType>('object_move');
   const [actTargetObj, setActTargetObj] = useState<string>('');
   const [actParam1, setActParam1] = useState<string>('5');
   const [actParam2, setActParam2] = useState<string>('0');
+  const [actParam3, setActParam3] = useState<string>('');
+  const [actParam4, setActParam4] = useState<string>('');
 
   const pushState = (newEvents: EventBlock[]) => {
     const nextHistory = eventHistory.slice(0, historyIndex + 1);
@@ -246,7 +251,8 @@ export default function EventSheetEditor({
       id: 'cond_' + Math.random().toString(36).substr(2, 9),
       type: selectedCondType,
       param1: condParam1,
-      param2: condParam2
+      param2: condParam2,
+      param3: condParam3 || undefined
     };
 
     const updated = updateBlockInTree(events, targetBlockId, (block) => {
@@ -277,7 +283,9 @@ export default function EventSheetEditor({
       type: selectedActType,
       targetObjectId: actTargetObj || undefined,
       param1: actParam1,
-      param2: actParam2
+      param2: actParam2,
+      param3: actParam3 || undefined,
+      param4: actParam4 || undefined
     };
 
     const updated = updateBlockInTree(events, targetBlockId, (block) => {
@@ -413,10 +421,18 @@ export default function EventSheetEditor({
         return '🏁 No início do Layout (On Start)';
       case 'system_tick':
         return '⏳ A cada quadro de atualização (Tick)';
+      case 'every_x_seconds':
+        return `⏱ A cada ${cond.param1 || '1'} segundos`;
+      case 'every_x_ticks':
+        return `⏱ A cada ${cond.param1 || '1'} ticks`;
+      case 'trigger_once':
+        return '🎯 Disparar uma única vez (Trigger Once)';
       case 'keyboard_keypress':
-        return `⌨ Ao pressionar a tecla: [${cond.param1}]`;
+        return `⌨ Ao pressionar tecla: [${cond.param1}]`;
       case 'keyboard_keyholding':
         return `⌨ Enquanto segura tecla: [${cond.param1}]`;
+      case 'keyboard_keyrelease':
+        return `⌨ Ao soltar tecla: [${cond.param1}]`;
       case 'object_collision':
         const objA = objects.find(o => o.id === cond.param1)?.name || cond.param1;
         const objB = objects.find(o => o.id === cond.param2)?.name || cond.param2;
@@ -426,12 +442,42 @@ export default function EventSheetEditor({
         return `🖱 Ao clicar com mouse no objeto '${objClickName}'`;
       case 'mouse_click':
         return `🖱 Ao clicar em qualquer local na tela`;
+      case 'object_distance':
+        return `📏 Distância entre '${cond.param1}' e '${cond.param2}' < ${cond.param3 || '100'}px`;
+      case 'object_count_compare':
+        return `🔢 Contagem de '${cond.param1}' ${cond.param2 || '>'}= ${cond.param3 || '1'}`;
+      case 'mouse_cursor_on_object':
+        return `🖱 Mouse sobre o objeto '${cond.param1}'`;
       case 'timer_elapsed':
-        return `⏳ Relógio/Cronômetro: Quando decorrido [${cond.param1}s]`;
+        return `⏳ Relógio: Quando decorrido [${cond.param1}s]`;
       case 'function_called':
-        return `🔊 Gatilho de Função No-Code: Ao chamar o método "${cond.param1}"`;
+        return `🔊 Gatilho de Função: Ao chamar "${cond.param1}"`;
       case 'gesture_touch':
-        return `📱 Toque na Tela: Quando arrastar ou deslizar dedo (Gesture)`;
+        return `📱 Toque na Tela: Gestos e deslizes`;
+      case 'global_var_compare':
+        return `📊 Variável Global '${cond.param1}' ${cond.param2 || '=='} ${cond.param3 || '0'}`;
+      case 'instance_var_compare':
+        return `📊 Variável de '${cond.param1}' ${cond.param2 || '=='} ${cond.param3 || '0'}`;
+      case 'compare_dictionary_value':
+        return `📖 Dicionário '${cond.param1}' chave ${cond.param2} ${cond.param3 || '=='}`;
+      case 'array_compare_at_index':
+        return `📊 Array '${cond.param1}' índice ${cond.param2} ${cond.param3 || '=='}`;
+      case 'else_condition':
+        return '🚫 Senão (Else)';
+      case 'always':
+        return '✅ Sempre (Always)';
+      case 'pick_random_instance':
+        return `🎲 Pegar instância aleatória de '${cond.param1}'`;
+      case 'pick_nearest':
+        return `📍 Pegar '${cond.param1}' mais próximo de '${cond.param2}'`;
+      case 'pick_farthest':
+        return `📍 Pegar '${cond.param1}' mais distante de '${cond.param2}'`;
+      case 'double_jump_available':
+        return `💨 Pulo duplo disponível para '${cond.param1}'`;
+      case 'is_on_floor':
+        return `⬇ '${cond.param1}' está no chão`;
+      case 'animation_finished':
+        return `🎬 Animação de '${cond.param1}' terminou`;
       default:
         return 'Condição Customizada';
     }
@@ -442,6 +488,8 @@ export default function EventSheetEditor({
     switch (act.type) {
       case 'object_move':
         return `🏃 Mover '${targetName}' por (${act.param1}px, ${act.param2}px)`;
+      case 'object_move_to':
+        return `🎯 Mover '${targetName}' para (${act.param1}px, ${act.param2}px) em ${act.param3 || '0'}s`;
       case 'object_set_pos':
         return `📍 Definir posição de '${targetName}' para (${act.param1}px, ${act.param2}px)`;
       case 'object_spawn':
@@ -452,31 +500,85 @@ export default function EventSheetEditor({
       case 'object_set_angle':
         return `🔄 Definir rotação de '${targetName}' para ${act.param1}°`;
       case 'object_set_scale':
-        return `↕ Redimensionar '${targetName}' escala factor para ${act.param1}x`;
+        return `↕ Redimensionar '${targetName}' escala para ${act.param1}x`;
       case 'object_set_opacity':
         return `👁 Opacidade de '${targetName}' para ${act.param1}`;
       case 'object_set_filter':
         return `🎨 Aplicar Filtro Shader de '${targetName}' para "${act.param1}"`;
       case 'object_set_blend':
-        return `🔗 Mudar Blend Mode de '${targetName}' para fusão "${act.param1}"`;
+        return `🔗 Mudar Blend Mode de '${targetName}' para "${act.param1}"`;
+      case 'object_set_visible':
+        return `👁 Visibilidade de '${targetName}' = ${act.param1}`;
+      case 'object_set_animation':
+        return `🎬 Animação de '${targetName}' = "${act.param1}"`;
+      case 'object_set_frame':
+        return `🖼 Frame de '${targetName}' para ${act.param1}`;
+      case 'object_set_size':
+        return `📐 Tamanho de '${targetName}' = ${act.param1}x${act.param2}`;
       case 'object_flash':
-        return `📳 Ativar Flash Piscar de '${targetName}' por ${act.param1} segundos`;
+        return `📳 Flash em '${targetName}' por ${act.param1}s`;
       case 'object_fade':
-        return `🌫 Desaparecer (Fade) de '${targetName}' durando ${act.param1} segundos`;
+        return `🌫 Fade em '${targetName}' por ${act.param1}s`;
+      case 'object_pin':
+        return `📌 Fixar '${targetName}' em '${act.param1}'`;
+      case 'object_unpin':
+        return `📌 Soltar '${targetName}'`;
       case 'play_sound':
-        return `🔊 Reproduzir Efeito de Som Clássico: "${act.param1}"`;
+        return `🔊 Tocar Som: "${act.param1}"`;
+      case 'play_music':
+        return `🎵 Tocar Música: "${act.param1}"`;
+      case 'stop_music':
+        return `⏹ Parar Música`;
       case 'system_add_variable':
-        return `➕ Somar ${act.param2} para variável global "${act.param1}"`;
+        return `➕ Somar ${act.param2} em "${act.param1}"`;
       case 'system_set_variable':
-        return `⚙ Mudar variável global "${act.param1}" para o valor ${act.param2}`;
+        return `⚙ Definir "${act.param1}" = ${act.param2}`;
+      case 'system_sub_variable':
+        return `➖ Subtrair ${act.param2} de "${act.param1}"`;
+      case 'set_instance_variable':
+        return `⚙ Variável de '${targetName}' = ${act.param1} = ${act.param2}`;
       case 'timer_start':
-        return `⏳ Ligar relógio local de "${targetName}" com duração de ${act.param1} segundos`;
+        return `⏳ Timer "${targetName}" = ${act.param1}s`;
+      case 'wait':
+        return `⏸ Aguardar ${act.param1}s`;
       case 'call_function':
-        return `🎮 Disparar Método de Função: chamar "${act.param1}"`;
+        return `🎮 Chamar Função: "${act.param1}"`;
+      case 'broadcast_function':
+        return `📢 Transmitir Função: "${act.param1}"`;
+      case 'go_to_layout':
+        return `🚪 Ir para cena: "${act.param1}"`;
+      case 'restart_layout':
+        return `🔄 Reiniciar cena atual`;
+      case 'next_layout':
+        return `⏭ Próxima cena`;
       case 'dictionary_set':
-        return `📖 Dicionário Plugin: gravar chave "${act.param1}" = "${act.param2}"`;
+        return `📖 Dicionário: "${act.param1}" = "${act.param2}"`;
       case 'array_push':
-        return `📊 Vetor/Array Plugin: empilhar o record "${act.param1}"`;
+        return `📊 Array: push "${act.param1}"`;
+      case 'array_pop':
+        return `📊 Array: pop`;
+      case 'array_insert':
+        return `📊 Array: inserir "${act.param1}" na posição ${act.param2}`;
+      case 'array_remove':
+        return `📊 Array: remover índice ${act.param1}`;
+      case 'array_set':
+        return `📊 Array: índice ${act.param1} = "${act.param2}"`;
+      case 'array_clear':
+        return `📊 Array: limpar`;
+      case 'set_camera_position':
+        return `📷 Camera para (${act.param1}, ${act.param2})`;
+      case 'scroll_to_object':
+        return `📷 Rolar camera até '${act.param1}'`;
+      case 'shake_camera':
+        return `📷 Chacoalhar câmera`;
+      case 'log_message':
+        return `📝 Log: "${act.param1}"`;
+      case 'set_gravity':
+        return `🌎 Gravidade = ${act.param1}`;
+      case 'set_velocity':
+        return `💨 Velocidade de '${targetName}' = (${act.param1}, ${act.param2})`;
+      case 'apply_force':
+        return `💥 Força em '${targetName}' = (${act.param1}, ${act.param2})`;
       default:
         return 'Ação do Sistema';
     }
@@ -1148,37 +1250,95 @@ export default function EventSheetEditor({
                   onChange={(e) => {
                     const val = e.target.value as ConditionType;
                     setSelectedCondType(val);
-                    // defaults
-                    if (val === 'keyboard_keypress' || val === 'keyboard_keyholding') {
+                    if (val === 'keyboard_keypress' || val === 'keyboard_keyholding' || val === 'keyboard_keyrelease') {
                       setCondParam1('Space');
-                    } else if (val === 'object_collision') {
+                    } else if (val === 'object_collision' || val === 'object_distance' || val === 'pick_nearest' || val === 'pick_farthest') {
                       if (objects.length > 0) {
                         setCondParam1(objects[0].id);
-                        setCondParam2(objects[0].id);
+                        setCondParam2(objects.length > 1 ? objects[1].id : objects[0].id);
                       }
+                      if (val === 'object_distance') setCondParam3('100');
                     } else if (val === 'timer_elapsed') {
                       setCondParam1('2.0');
                     } else if (val === 'function_called') {
                       setCondParam1('AtacarInimigo');
+                    } else if (val === 'every_x_seconds') {
+                      setCondParam1('1.0');
+                    } else if (val === 'every_x_ticks') {
+                      setCondParam1('60');
+                    } else if (val === 'object_count_compare') {
+                      setCondParam1(objects[0]?.id || '');
+                      setCondParam2('>=');
+                      setCondParam3('1');
+                    } else if (val === 'global_var_compare') {
+                      setCondParam1(Object.keys(globalVariables)[0] || '');
+                      setCondParam2('==');
+                      setCondParam3('0');
+                    } else if (val === 'instance_var_compare') {
+                      setCondParam1(objects[0]?.id || '');
+                      setCondParam2('HP');
+                      setCondParam3('0');
+                    } else if (val === 'compare_dictionary_value') {
+                      setCondParam1(dictionaries[0]?.id || '');
+                      setCondParam2('chave');
+                      setCondParam3('==');
+                    } else if (val === 'array_compare_at_index') {
+                      setCondParam1(arrays[0]?.id || '');
+                      setCondParam2('0');
+                      setCondParam3('==');
+                    } else if (val === 'object_click' || val === 'mouse_cursor_on_object' || val === 'pick_random_instance' || val === 'is_on_floor' || val === 'double_jump_available' || val === 'animation_finished') {
+                      setCondParam1(objects[0]?.id || '');
                     }
                   }}
                   className="w-full bg-[#11121a] border border-slate-800 text-xs text-slate-200 p-2 rounded focus:border-indigo-505 font-mono outline-none"
                 >
-                  <option value="system_onload">No início do jogo (On Start Layout)</option>
-                  <option value="system_tick">A cada quadro (Tick constante)</option>
-                  <option value="keyboard_keypress">Teclado: Ao pressionar tecla (Key Pressed)</option>
-                  <option value="keyboard_keyholding">Teclado: Enquanto segura tecla (Key Holding)</option>
+                  <option value="system_onload">Início do Layout (On Start)</option>
+                  <option value="system_tick">A cada quadro (Every Tick)</option>
+                  <option value="every_x_seconds">A cada X segundos (Every X Seconds)</option>
+                  <option value="every_x_ticks">A cada X ticks (Every X Ticks)</option>
+                  <option value="trigger_once">Disparar uma única vez (Trigger Once)</option>
+                  <option value="always">Sempre verdadeiro (Always)</option>
+                  <option value="else_condition">Senão (Else)</option>
+                  <option value="keyboard_keypress">Teclado: Ao pressionar tecla</option>
+                  <option value="keyboard_keyholding">Teclado: Enquanto segura tecla</option>
+                  <option value="keyboard_keyrelease">Teclado: Ao soltar tecla</option>
                   <option value="object_collision">Colisão: Objeto colide com outro</option>
-                  <option value="object_click">Mouse: Cliques em um Objeto</option>
-                  <option value="mouse_click">Mouse: Cliques no Cenário</option>
-                  <option value="timer_elapsed">Timer: Ao esgotar relógio (Timer elapsed)</option>
-                  <option value="function_called">Função: Quando a função No-Code for executada</option>
-                  <option value="gesture_touch">Touch: Toques e gestos deslizantes na tela</option>
+                  <option value="object_click">Mouse: Clique em Objeto</option>
+                  <option value="mouse_click">Mouse: Clique no Cenário</option>
+                  <option value="mouse_cursor_on_object">Mouse: Cursor sobre Objeto</option>
+                  <option value="object_distance">Distância: Comparar distância entre objetos</option>
+                  <option value="object_count_compare">Contagem: Comparar nº de instâncias</option>
+                  <option value="timer_elapsed">Timer: Ao esgotar relógio</option>
+                  <option value="function_called">Função: Quando a função for executada</option>
+                  <option value="gesture_touch">Touch: Gestos na tela</option>
+                  <option value="global_var_compare">Variável Global: Comparar valor</option>
+                  <option value="instance_var_compare">Variável de Instância: Comparar</option>
+                  <option value="compare_dictionary_value">Dicionário: Comparar valor</option>
+                  <option value="array_compare_at_index">Array: Comparar valor no índice</option>
+                  <option value="pick_random_instance">Seleção: Instância aleatória</option>
+                  <option value="pick_nearest">Seleção: Instância mais próxima</option>
+                  <option value="pick_farthest">Seleção: Instância mais distante</option>
+                  <option value="is_on_floor">Solo: Objeto está no chão?</option>
+                  <option value="double_jump_available">Pulo Duplo: Disponível?</option>
+                  <option value="animation_finished">Animação: Terminou de tocar?</option>
                 </select>
               </div>
 
               {/* Dynamic Input render according to choose type */}
-              {(selectedCondType === 'keyboard_keypress' || selectedCondType === 'keyboard_keyholding') && (
+              {(selectedCondType === 'every_x_seconds' || selectedCondType === 'every_x_ticks') && (
+                <div>
+                  <label className="text-[10px] font-bold text-slate-405 block mb-1">Intervalo:</label>
+                  <input
+                    type="text"
+                    value={condParam1}
+                    onChange={(e) => setCondParam1(e.target.value)}
+                    className="w-full bg-[#11121a] border border-slate-800 text-xs text-slate-200 p-2 rounded focus:border-indigo-505 font-mono outline-none"
+                    placeholder={selectedCondType === 'every_x_seconds' ? 'ex: 0.5' : 'ex: 60'}
+                  />
+                </div>
+              )}
+
+              {(selectedCondType === 'keyboard_keypress' || selectedCondType === 'keyboard_keyholding' || selectedCondType === 'keyboard_keyrelease') && (
                 <div>
                   <label className="text-[10px] font-bold text-slate-405 block mb-1">Escolher Tecla:</label>
                   <select
@@ -1240,6 +1400,181 @@ export default function EventSheetEditor({
                       <option key={o.id} value={o.id}>{o.name}</option>
                     ))}
                   </select>
+                </div>
+              )}
+
+              {selectedCondType === 'mouse_cursor_on_object' && (
+                <div>
+                  <label className="text-[10px] font-bold text-slate-405 block mb-1">Objeto:</label>
+                  <select value={condParam1} onChange={(e) => setCondParam1(e.target.value)}
+                    className="w-full bg-[#11121a] border border-slate-800 text-xs text-slate-200 p-2 rounded outline-none font-bold">
+                    {objects.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                  </select>
+                </div>
+              )}
+
+              {selectedCondType === 'object_distance' && (
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-405 block mb-1">De:</label>
+                    <select value={condParam1} onChange={(e) => setCondParam1(e.target.value)}
+                      className="w-full bg-[#11121a] border border-slate-800 text-xs text-slate-200 p-2 rounded outline-none font-bold">
+                      {objects.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-405 block mb-1">Até:</label>
+                    <select value={condParam2} onChange={(e) => setCondParam2(e.target.value)}
+                      className="w-full bg-[#11121a] border border-slate-800 text-xs text-slate-200 p-2 rounded outline-none font-bold">
+                      {objects.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-405 block mb-1">Dist. máx:</label>
+                    <input type="text" value={condParam3} onChange={(e) => setCondParam3(e.target.value)}
+                      className="w-full bg-[#11121a] border border-slate-800 text-xs text-slate-200 p-2 rounded outline-none font-mono" />
+                  </div>
+                </div>
+              )}
+
+              {selectedCondType === 'object_count_compare' && (
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-405 block mb-1">Objeto:</label>
+                    <select value={condParam1} onChange={(e) => setCondParam1(e.target.value)}
+                      className="w-full bg-[#11121a] border border-slate-800 text-xs text-slate-200 p-2 rounded outline-none font-bold">
+                      {objects.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-405 block mb-1">Comparação:</label>
+                    <select value={condParam2} onChange={(e) => setCondParam2(e.target.value)}
+                      className="w-full bg-[#11121a] border border-slate-800 text-xs text-slate-200 p-2 rounded outline-none font-mono">
+                      <option value=">=">≥</option>
+                      <option value="<=">≤</option>
+                      <option value="==">=</option>
+                      <option value=">">{'>'}</option>
+                      <option value="<">{'<'}</option>
+                      <option value="!=">≠</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-405 block mb-1">Valor:</label>
+                    <input type="text" value={condParam3} onChange={(e) => setCondParam3(e.target.value)}
+                      className="w-full bg-[#11121a] border border-slate-800 text-xs text-slate-200 p-2 rounded outline-none font-mono" />
+                  </div>
+                </div>
+              )}
+
+              {selectedCondType === 'global_var_compare' && (
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-405 block mb-1">Variável:</label>
+                    <select value={condParam1} onChange={(e) => setCondParam1(e.target.value)}
+                      className="w-full bg-[#11121a] border border-slate-800 text-xs text-slate-200 p-2 rounded outline-none font-bold">
+                      {Object.keys(globalVariables).map(k => <option key={k} value={k}>{k}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-405 block mb-1">Comparação:</label>
+                    <select value={condParam2} onChange={(e) => setCondParam2(e.target.value)}
+                      className="w-full bg-[#11121a] border border-slate-800 text-xs text-slate-200 p-2 rounded outline-none font-mono">
+                      <option value="==">=</option>
+                      <option value="!=">≠</option>
+                      <option value=">">{'>'}</option>
+                      <option value="<">{'<'}</option>
+                      <option value=">=">≥</option>
+                      <option value="<=">≤</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-405 block mb-1">Valor:</label>
+                    <input type="text" value={condParam3} onChange={(e) => setCondParam3(e.target.value)}
+                      className="w-full bg-[#11121a] border border-slate-800 text-xs text-slate-200 p-2 rounded outline-none font-mono" />
+                  </div>
+                </div>
+              )}
+
+              {selectedCondType === 'instance_var_compare' && (
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-405 block mb-1">Objeto:</label>
+                    <select value={condParam1} onChange={(e) => setCondParam1(e.target.value)}
+                      className="w-full bg-[#11121a] border border-slate-800 text-xs text-slate-200 p-2 rounded outline-none font-bold">
+                      {objects.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-405 block mb-1">Variável:</label>
+                    <input type="text" value={condParam2} onChange={(e) => setCondParam2(e.target.value)}
+                      className="w-full bg-[#11121a] border border-slate-800 text-xs text-slate-200 p-2 rounded outline-none font-mono" placeholder="ex: HP" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-405 block mb-1">Valor:</label>
+                    <input type="text" value={condParam3} onChange={(e) => setCondParam3(e.target.value)}
+                      className="w-full bg-[#11121a] border border-slate-800 text-xs text-slate-200 p-2 rounded outline-none font-mono" />
+                  </div>
+                </div>
+              )}
+
+              {selectedCondType === 'compare_dictionary_value' && (
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-405 block mb-1">Dicionário:</label>
+                    <select value={condParam1} onChange={(e) => setCondParam1(e.target.value)}
+                      className="w-full bg-[#11121a] border border-slate-800 text-xs text-slate-200 p-2 rounded outline-none font-bold">
+                      {dictionaries.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-405 block mb-1">Chave:</label>
+                    <input type="text" value={condParam2} onChange={(e) => setCondParam2(e.target.value)}
+                      className="w-full bg-[#11121a] border border-slate-800 text-xs text-slate-200 p-2 rounded outline-none font-mono" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-405 block mb-1">Valor eq:</label>
+                    <input type="text" value={condParam3} onChange={(e) => setCondParam3(e.target.value)}
+                      className="w-full bg-[#11121a] border border-slate-800 text-xs text-slate-200 p-2 rounded outline-none font-mono" />
+                  </div>
+                </div>
+              )}
+
+              {selectedCondType === 'array_compare_at_index' && (
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-405 block mb-1">Array:</label>
+                    <select value={condParam1} onChange={(e) => setCondParam1(e.target.value)}
+                      className="w-full bg-[#11121a] border border-slate-800 text-xs text-slate-200 p-2 rounded outline-none font-bold">
+                      {arrays.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-405 block mb-1">Índice:</label>
+                    <input type="text" value={condParam2} onChange={(e) => setCondParam2(e.target.value)}
+                      className="w-full bg-[#11121a] border border-slate-800 text-xs text-slate-200 p-2 rounded outline-none font-mono" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-405 block mb-1">Comparação:</label>
+                    <input type="text" value={condParam3} onChange={(e) => setCondParam3(e.target.value)}
+                      className="w-full bg-[#11121a] border border-slate-800 text-xs text-slate-200 p-2 rounded outline-none font-mono" placeholder="ex: == 10" />
+                  </div>
+                </div>
+              )}
+
+              {(selectedCondType === 'pick_random_instance' || selectedCondType === 'is_on_floor' || selectedCondType === 'double_jump_available' || selectedCondType === 'animation_finished' || selectedCondType === 'pick_nearest' || selectedCondType === 'pick_farthest') && (
+                <div>
+                  <label className="text-[10px] font-bold text-slate-405 block mb-1">Objeto:</label>
+                  <select value={condParam1} onChange={(e) => setCondParam1(e.target.value)}
+                    className="w-full bg-[#11121a] border border-slate-800 text-xs text-slate-200 p-2 rounded outline-none font-bold">
+                    {objects.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                  </select>
+                  {selectedCondType === 'pick_nearest' && (
+                    <div className="mt-2">
+                      <label className="text-[10px] font-bold text-slate-405 block mb-1">Referência (ID da instância):</label>
+                      <input type="text" value={condParam2} onChange={(e) => setCondParam2(e.target.value)}
+                        className="w-full bg-[#11121a] border border-slate-800 text-xs text-slate-200 p-2 rounded outline-none font-mono" placeholder="ID da instância" />
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1318,37 +1653,105 @@ export default function EventSheetEditor({
                   onChange={(e) => {
                     const v = e.target.value as ActionType;
                     setSelectedActType(v);
+                    setActParam1('');
+                    setActParam2('');
+                    setActParam3('');
+                    setActParam4('');
                     if (v === 'play_sound' && sounds.length > 0) {
                       setActParam1(sounds[0].name);
+                    } else if (v === 'play_music' && music.length > 0) {
+                      setActParam1(music[0].name);
                     } else if (v === 'object_set_filter') {
                       setActParam1('grayscale');
                     } else if (v === 'object_set_blend') {
                       setActParam1('add');
+                    } else if (v === 'object_spawn') {
+                      if (objects.length > 0) setActParam1(objects[0].id);
+                    } else if (v === 'object_set_visible') {
+                      setActParam1('true');
+                    } else if (v === 'object_set_animation' && objects.length > 0) {
+                      setActParam1(objects[0].id);
+                      setActParam2('walk');
+                    } else if (v === 'object_set_size') {
+                      setActParam1('32');
+                      setActParam2('32');
                     } else if (v === 'dictionary_set') {
                       setActParam1('Score');
                       setActParam2('10');
+                    } else if (v === 'object_move_to') {
+                      setActParam1('100');
+                      setActParam2('100');
+                      setActParam3('1');
+                    } else if (v === 'object_pin') {
+                      setActParam1(objects.length > 0 ? objects[0].id : '');
+                    } else if (v === 'go_to_layout') {
+                      setActParam1('layout2');
+                    } else if (v === 'array_insert') {
+                      setActParam1('valor');
+                      setActParam2('0');
+                    } else if (v === 'array_set') {
+                      setActParam1('0');
+                      setActParam2('valor');
+                    } else if (v === 'set_velocity' || v === 'apply_force') {
+                      setActParam1('0');
+                      setActParam2('-300');
+                    } else if (v === 'set_gravity') {
+                      setActParam1('800');
+                    } else if (v === 'set_camera_position') {
+                      setActParam1('0');
+                      setActParam2('0');
+                    } else if (v === 'scroll_to_object') {
+                      setActParam1(objects.length > 0 ? objects[0].id : '');
                     }
                   }}
                   className="w-full bg-[#11121a] border border-slate-800 text-xs text-slate-200 p-2 rounded focus:border-indigo-505 font-mono outline-none"
                 >
-                  <option value="object_move">Objeto: Mover coordenadas relativas (X, Y)</option>
+                  <option value="object_move">Objeto: Mover por deslocamento (X, Y)</option>
+                  <option value="object_move_to">Objeto: Mover para posição (X, Y) com duração</option>
                   <option value="object_set_pos">Objeto: Definir posição exata (X, Y)</option>
-                  <option value="object_spawn">Objeto: Spawn / Instanciar outro Objeto no local</option>
-                  <option value="object_destroy">Objeto: Deletar/Destruir instâncias do jogo</option>
+                  <option value="object_spawn">Objeto: Spawn / Instanciar outro Objeto</option>
+                  <option value="object_destroy">Objeto: Destruir instâncias</option>
                   <option value="object_set_angle">Objeto: Definir Ângulo de rotação</option>
-                  <option value="object_set_scale">Objeto: Definir fator de escala</option>
-                  <option value="object_set_opacity">Objeto: Modificar Transparência Opacidade</option>
-                  <option value="object_set_filter">Objeto: Aplicar Filtro Shader Visual</option>
-                  <option value="object_set_blend">Objeto: Mutar Blend Mode (Fusão de camadas)</option>
-                  <option value="object_flash">Objeto: flash piscar intermitente rápido</option>
-                  <option value="object_fade">Objeto: desaparecer suavemente (Fade)</option>
-                  <option value="timer_start">Cronômetro: Disparar relógio com alarme tempo</option>
-                  <option value="play_sound">Som: Tocar Efeito de som synth registado</option>
-                  <option value="system_add_variable">Variáveis: Somar valor à Variável Global</option>
-                  <option value="system_set_variable">Variáveis: Fixar valor exato na Variável</option>
-                  <option value="call_function">Função: Disparar acionador de método no-code</option>
-                  <option value="dictionary_set">Plugins: Gravar valor no Dicionário de dados</option>
-                  <option value="array_push">Plugins: Empilhar registro no vetor do Array</option>
+                  <option value="object_set_scale">Objeto: Definir escala</option>
+                  <option value="object_set_size">Objeto: Definir tamanho (Largura, Altura)</option>
+                  <option value="object_set_opacity">Objeto: Modificar Opacidade</option>
+                  <option value="object_set_filter">Objeto: Aplicar Filtro Visual</option>
+                  <option value="object_set_blend">Objeto: Mudar Blend Mode</option>
+                  <option value="object_set_visible">Objeto: Visível / Invisível</option>
+                  <option value="object_set_animation">Objeto: Tocar animação</option>
+                  <option value="object_set_frame">Objeto: Definir frame da animação</option>
+                  <option value="object_flash">Objeto: Piscar (Flash)</option>
+                  <option value="object_fade">Objeto: Desaparecer (Fade)</option>
+                  <option value="object_pin">Objeto: Fixar a outro objeto</option>
+                  <option value="object_unpin">Objeto: Soltar (unpin)</option>
+                  <option value="timer_start">Timer: Iniciar relógio</option>
+                  <option value="wait">Timer: Aguardar segundos</option>
+                  <option value="play_sound">Som: Tocar efeito sonoro</option>
+                  <option value="play_music">Música: Tocar trilha</option>
+                  <option value="stop_music">Música: Parar</option>
+                  <option value="system_add_variable">Variável Global: Somar valor</option>
+                  <option value="system_sub_variable">Variável Global: Subtrair valor</option>
+                  <option value="system_set_variable">Variável Global: Definir valor</option>
+                  <option value="set_instance_variable">Variável de Instância: Definir</option>
+                  <option value="call_function">Função: Chamar</option>
+                  <option value="broadcast_function">Função: Transmitir para todos</option>
+                  <option value="go_to_layout">Cena: Ir para layout</option>
+                  <option value="restart_layout">Cena: Reiniciar</option>
+                  <option value="next_layout">Cena: Próximo layout</option>
+                  <option value="dictionary_set">Dicionário: Gravar valor</option>
+                  <option value="array_push">Array: Push</option>
+                  <option value="array_pop">Array: Pop</option>
+                  <option value="array_insert">Array: Inserir na posição</option>
+                  <option value="array_remove">Array: Remover índice</option>
+                  <option value="array_set">Array: Definir no índice</option>
+                  <option value="array_clear">Array: Limpar</option>
+                  <option value="set_camera_position">Câmera: Posicionar</option>
+                  <option value="scroll_to_object">Câmera: Rolar até objeto</option>
+                  <option value="shake_camera">Câmera: Chacoalhar</option>
+                  <option value="set_gravity">Física: Definir gravidade</option>
+                  <option value="set_velocity">Física: Definir velocidade</option>
+                  <option value="apply_force">Física: Aplicar força</option>
+                  <option value="log_message">Depuração: Log mensagem</option>
                 </select>
               </div>
 
@@ -1598,15 +2001,279 @@ export default function EventSheetEditor({
                 </div>
               )}
 
-              {selectedActType === 'array_push' && (
+              {selectedActType === 'object_move_to' && (
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">X:</label>
+                    <input type="text" value={actParam1} onChange={(e) => setActParam1(e.target.value)}
+                      className="w-full bg-[#11121a] border border-slate-800 text-xs text-white rounded p-1.5 font-mono outline-none" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">Y:</label>
+                    <input type="text" value={actParam2} onChange={(e) => setActParam2(e.target.value)}
+                      className="w-full bg-[#11121a] border border-slate-800 text-xs text-white rounded p-1.5 font-mono outline-none" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">Duração (s):</label>
+                    <input type="text" value={actParam3} onChange={(e) => setActParam3(e.target.value)}
+                      className="w-full bg-[#11121a] border border-slate-800 text-xs text-white rounded p-1.5 font-mono outline-none" />
+                  </div>
+                </div>
+              )}
+
+              {selectedActType === 'object_set_size' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">Largura:</label>
+                    <input type="text" value={actParam1} onChange={(e) => setActParam1(e.target.value)}
+                      className="w-full bg-[#11121a] border border-slate-800 text-xs text-white rounded p-1.5 font-mono outline-none" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">Altura:</label>
+                    <input type="text" value={actParam2} onChange={(e) => setActParam2(e.target.value)}
+                      className="w-full bg-[#11121a] border border-slate-800 text-xs text-white rounded p-1.5 font-mono outline-none" />
+                  </div>
+                </div>
+              )}
+
+              {selectedActType === 'object_set_visible' && (
                 <div>
-                  <label className="text-xs text-slate-400 block mb-1">Valor para empilhar (Push):</label>
-                  <input
-                    type="text"
-                    className="w-full bg-[#11121a] border border-slate-800 text-xs text-white rounded p-1.5 font-mono focus:border-indigo-505 outline-none"
-                    value={actParam1}
-                    onChange={(e) => setActParam1(e.target.value)}
-                  />
+                  <label className="text-xs text-slate-400 block mb-1">Visível:</label>
+                  <select value={actParam1} onChange={(e) => setActParam1(e.target.value)}
+                    className="w-full bg-[#11121a] border border-slate-800 text-xs text-slate-200 p-2 rounded outline-none font-bold">
+                    <option value="true">Sim</option>
+                    <option value="false">Não</option>
+                  </select>
+                </div>
+              )}
+
+              {selectedActType === 'object_set_animation' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">Objeto:</label>
+                    <select value={actParam1} onChange={(e) => setActParam1(e.target.value)}
+                      className="w-full bg-[#11121a] border border-slate-800 text-xs text-slate-200 p-2 rounded outline-none font-bold">
+                      {objects.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">Animação:</label>
+                    <input type="text" value={actParam2} onChange={(e) => setActParam2(e.target.value)}
+                      className="w-full bg-[#11121a] border border-slate-800 text-xs text-white rounded p-1.5 font-mono outline-none"
+                      placeholder="ex: walk" />
+                  </div>
+                </div>
+              )}
+
+              {selectedActType === 'object_set_frame' && (
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Nº do Frame:</label>
+                  <input type="text" value={actParam1} onChange={(e) => setActParam1(e.target.value)}
+                    className="w-full bg-[#11121a] border border-slate-800 text-xs text-white rounded p-1.5 font-mono outline-none" />
+                </div>
+              )}
+
+              {selectedActType === 'object_pin' && (
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Fixar em qual objeto:</label>
+                  <select value={actParam1} onChange={(e) => setActParam1(e.target.value)}
+                    className="w-full bg-[#11121a] border border-slate-800 text-xs text-slate-200 p-2 rounded outline-none font-bold">
+                    {objects.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                  </select>
+                </div>
+              )}
+
+              {selectedActType === 'wait' && (
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Segundos para aguardar:</label>
+                  <input type="text" value={actParam1} onChange={(e) => setActParam1(e.target.value)}
+                    className="w-full bg-[#11121a] border border-slate-800 text-xs text-white rounded p-1.5 font-mono outline-none" placeholder="ex: 1.5" />
+                </div>
+              )}
+
+              {selectedActType === 'play_music' && (
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1 font-bold">Música:</label>
+                  <select value={actParam1} onChange={(e) => setActParam1(e.target.value)}
+                    className="w-full bg-[#11121a] border border-slate-800 text-xs text-slate-200 p-2 rounded outline-none font-mono">
+                    {music.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+                  </select>
+                </div>
+              )}
+
+              {selectedActType === 'system_sub_variable' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1 font-bold">Variável:</label>
+                    <select value={actParam1} onChange={(e) => setActParam1(e.target.value)}
+                      className="w-full bg-[#11121a] border border-slate-800 text-xs text-slate-200 p-2 rounded outline-none font-mono">
+                      {Object.keys(globalVariables).map(k => <option key={k} value={k}>{k}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1 font-bold">Valor:</label>
+                    <input type="text" value={actParam2} onChange={(e) => setActParam2(e.target.value)}
+                      className="w-full bg-[#11121a] border border-slate-800 text-xs text-white rounded p-1.5 font-mono outline-none" />
+                  </div>
+                </div>
+              )}
+
+              {selectedActType === 'set_instance_variable' && (
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">Objeto:</label>
+                    <select value={actTargetObj} onChange={(e) => setActTargetObj(e.target.value)}
+                      className="w-full bg-[#11121a] border border-slate-800 text-xs text-slate-200 p-2 rounded outline-none font-bold">
+                      <option value="">Sistema</option>
+                      {objects.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">Variável:</label>
+                    <input type="text" value={actParam1} onChange={(e) => setActParam1(e.target.value)}
+                      className="w-full bg-[#11121a] border border-slate-800 text-xs text-white rounded p-1.5 font-mono outline-none" placeholder="ex: HP" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">Valor:</label>
+                    <input type="text" value={actParam2} onChange={(e) => setActParam2(e.target.value)}
+                      className="w-full bg-[#11121a] border border-slate-800 text-xs text-white rounded p-1.5 font-mono outline-none" />
+                  </div>
+                </div>
+              )}
+
+              {selectedActType === 'broadcast_function' && (
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Nome da Função:</label>
+                  <input type="text" value={actParam1} onChange={(e) => setActParam1(e.target.value)}
+                    className="w-full bg-[#11121a] border border-slate-800 text-xs text-white rounded p-1.5 font-mono outline-none"
+                    placeholder="e.g. BossMorreu" />
+                </div>
+              )}
+
+              {selectedActType === 'go_to_layout' && (
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Nome do Layout:</label>
+                  <input type="text" value={actParam1} onChange={(e) => setActParam1(e.target.value)}
+                    className="w-full bg-[#11121a] border border-slate-800 text-xs text-white rounded p-1.5 font-mono outline-none"
+                    placeholder="e.g. fase2" />
+                </div>
+              )}
+
+              {selectedActType === 'array_insert' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">Valor:</label>
+                    <input type="text" value={actParam1} onChange={(e) => setActParam1(e.target.value)}
+                      className="w-full bg-[#11121a] border border-slate-800 text-xs text-white rounded p-1.5 font-mono outline-none" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">Posição:</label>
+                    <input type="text" value={actParam2} onChange={(e) => setActParam2(e.target.value)}
+                      className="w-full bg-[#11121a] border border-slate-800 text-xs text-white rounded p-1.5 font-mono outline-none" />
+                  </div>
+                </div>
+              )}
+
+              {selectedActType === 'array_remove' && (
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Índice:</label>
+                  <input type="text" value={actParam1} onChange={(e) => setActParam1(e.target.value)}
+                    className="w-full bg-[#11121a] border border-slate-800 text-xs text-white rounded p-1.5 font-mono outline-none" />
+                </div>
+              )}
+
+              {selectedActType === 'array_set' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">Índice:</label>
+                    <input type="text" value={actParam1} onChange={(e) => setActParam1(e.target.value)}
+                      className="w-full bg-[#11121a] border border-slate-800 text-xs text-white rounded p-1.5 font-mono outline-none" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">Valor:</label>
+                    <input type="text" value={actParam2} onChange={(e) => setActParam2(e.target.value)}
+                      className="w-full bg-[#11121a] border border-slate-800 text-xs text-white rounded p-1.5 font-mono outline-none" />
+                  </div>
+                </div>
+              )}
+
+              {selectedActType === 'array_clear' && (
+                <p className="text-xs text-slate-500 italic">Todos os valores do array serão removidos.</p>
+              )}
+
+              {selectedActType === 'set_camera_position' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">X:</label>
+                    <input type="text" value={actParam1} onChange={(e) => setActParam1(e.target.value)}
+                      className="w-full bg-[#11121a] border border-slate-800 text-xs text-white rounded p-1.5 font-mono outline-none" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">Y:</label>
+                    <input type="text" value={actParam2} onChange={(e) => setActParam2(e.target.value)}
+                      className="w-full bg-[#11121a] border border-slate-800 text-xs text-white rounded p-1.5 font-mono outline-none" />
+                  </div>
+                </div>
+              )}
+
+              {selectedActType === 'scroll_to_object' && (
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Objeto:</label>
+                  <select value={actParam1} onChange={(e) => setActParam1(e.target.value)}
+                    className="w-full bg-[#11121a] border border-slate-800 text-xs text-slate-200 p-2 rounded outline-none font-bold">
+                    {objects.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                  </select>
+                </div>
+              )}
+
+              {selectedActType === 'shake_camera' && (
+                <p className="text-xs text-slate-500 italic">A câmera irá tremer por 0.5 segundos.</p>
+              )}
+
+              {selectedActType === 'set_gravity' && (
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Valor da Gravidade:</label>
+                  <input type="text" value={actParam1} onChange={(e) => setActParam1(e.target.value)}
+                    className="w-full bg-[#11121a] border border-slate-800 text-xs text-white rounded p-1.5 font-mono outline-none" placeholder="ex: 800" />
+                </div>
+              )}
+
+              {selectedActType === 'set_velocity' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">Velocidade X:</label>
+                    <input type="text" value={actParam1} onChange={(e) => setActParam1(e.target.value)}
+                      className="w-full bg-[#11121a] border border-slate-800 text-xs text-white rounded p-1.5 font-mono outline-none" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">Velocidade Y:</label>
+                    <input type="text" value={actParam2} onChange={(e) => setActParam2(e.target.value)}
+                      className="w-full bg-[#11121a] border border-slate-800 text-xs text-white rounded p-1.5 font-mono outline-none" />
+                  </div>
+                </div>
+              )}
+
+              {selectedActType === 'apply_force' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">Força X:</label>
+                    <input type="text" value={actParam1} onChange={(e) => setActParam1(e.target.value)}
+                      className="w-full bg-[#11121a] border border-slate-800 text-xs text-white rounded p-1.5 font-mono outline-none" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">Força Y:</label>
+                    <input type="text" value={actParam2} onChange={(e) => setActParam2(e.target.value)}
+                      className="w-full bg-[#11121a] border border-slate-800 text-xs text-white rounded p-1.5 font-mono outline-none" />
+                  </div>
+                </div>
+              )}
+
+              {selectedActType === 'log_message' && (
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Mensagem de Log:</label>
+                  <input type="text" value={actParam1} onChange={(e) => setActParam1(e.target.value)}
+                    className="w-full bg-[#11121a] border border-slate-800 text-xs text-white rounded p-1.5 font-mono outline-none"
+                    placeholder="ex: Jogador morreu!" />
                 </div>
               )}
             </div>
