@@ -14,6 +14,7 @@ interface SceneEditorProps {
   onSelectObject: (obj: ProjectObject) => void;
   selectedObject: ProjectObject | null;
   onAddObject: () => void;
+  onUpdateObject?: (obj: ProjectObject) => void;
 }
 
 const TILE_DEFINITIONS: TileDef[] = [
@@ -29,7 +30,8 @@ export default function SceneEditor({
   onUpdateScene,
   onSelectObject,
   selectedObject,
-  onAddObject
+  onAddObject,
+  onUpdateObject = () => {}
 }: SceneEditorProps) {
   const [editorMode, setEditorMode] = useState<'instances' | 'tiles'>('instances');
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
@@ -629,10 +631,14 @@ export default function SceneEditor({
         nextProperties.gravity = 850;
         nextProperties.jumpStrength = 400;
         nextProperties.acceleration = 600;
+        nextProperties.deceleration = 850;
         nextProperties.doubleJump = true;
+      } else if (bName === '8Direction') {
+        nextProperties.speed = 150;
       } else if (bName === 'Car') {
         nextProperties.carSpeed = 220;
         nextProperties.carAcceleration = 180;
+        nextProperties.carDeceleration = 100;
         nextProperties.carTurnSpeed = 130;
         nextProperties.carDriftFactor = 0.75;
       } else if (bName === 'Bullet') {
@@ -641,6 +647,16 @@ export default function SceneEditor({
       } else if (bName === 'Sine') {
         nextProperties.sineAmplitude = 60;
         nextProperties.sinePeriod = 2.5;
+      } else if (bName === 'Flash') {
+        nextProperties.flashDuration = 1;
+      } else if (bName === 'Fade') {
+        nextProperties.fadeDuration = 1.5;
+      } else if (bName === 'Timer') {
+        nextProperties.timerValue = 2;
+      } else if (bName === 'Physics') {
+        nextProperties.gravity = 800;
+      } else if (bName === 'Pathfinding') {
+        nextProperties.speed = 100;
       }
     }
 
@@ -651,13 +667,8 @@ export default function SceneEditor({
       properties: nextProperties
     };
 
-    const targetIndex = objects.findIndex(o => o.id === targetObj.id);
-    if (targetIndex !== -1) {
-      const upObj = [...objects];
-      upObj[targetIndex] = changed;
-      // Triggers update through fake App trigger (direct propagation in scene edit state context)
-      onSelectObject(changed);
-    }
+    onUpdateObject(changed);
+    onSelectObject(changed);
   };
 
   const selectedInst = scene.instances.find(i => i.id === selectedInstanceId);
@@ -951,15 +962,25 @@ export default function SceneEditor({
                     </button>
                     
                     {/* INJECT BEHAVIORS CONFIG HERE */}
-                    <div className="pt-3 border-t border-[#2d2e3d] mt-4">
+                      <div className="pt-3 border-t border-[#2d2e3d] mt-4">
                       <h4 className="text-[10px] font-bold text-slate-300 font-mono mb-2 uppercase">Comportamentos</h4>
-                      <div className="space-y-1.5">
+                      <div className="grid grid-cols-2 gap-1.5">
                         {[
                           { name: 'Platform' },
                           { name: '8Direction' },
                           { name: 'Solid' },
+                          { name: 'JumpThru' },
                           { name: 'BoundToLayout' },
-                          { name: 'ScrollTo' }
+                          { name: 'ScrollTo' },
+                          { name: 'Bullet' },
+                          { name: 'Sine' },
+                          { name: 'Car' },
+                          { name: 'Flash' },
+                          { name: 'Fade' },
+                          { name: 'Timer' },
+                          { name: 'Pin' },
+                          { name: 'Physics' },
+                          { name: 'Pathfinding' }
                         ].map(bh => {
                           const enabled = selectedInstObjDef.behaviors?.includes(bh.name);
                           return (

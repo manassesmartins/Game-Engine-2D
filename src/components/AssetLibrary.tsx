@@ -54,7 +54,7 @@ export default function AssetLibrary({ onImportObject, onImportSound, onImportMu
           }
         ],
         currentAnimation: 'walk',
-        behaviors: ['Platformer', 'DestroyOutside'],
+        behaviors: ['Platform', 'BoundToLayout'],
         properties: {
           speed: 160,
           jumpStrength: 380,
@@ -162,7 +162,7 @@ export default function AssetLibrary({ onImportObject, onImportSound, onImportMu
         ],
         animations: [{ id: 'fly', name: 'Voar', frames: ['bullet_f1'], speed: 10, loop: true }],
         currentAnimation: 'fly',
-        behaviors: ['Bullet', 'DestroyOutside'],
+        behaviors: ['Bullet', 'BoundToLayout'],
         properties: {
           bulletSpeed: 380
         }

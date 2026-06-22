@@ -215,7 +215,7 @@ export class EngineRunner {
       const behaviors = obj.behaviors || [];
 
       // 1. Sine Behavior
-      if (behaviors.includes('Sine') || behaviors.includes('Sine')) {
+      if (behaviors.includes('Sine')) {
         inst.sineAccumulator += dt;
         const amp = obj.properties.sineAmplitude || 50;
         const period = obj.properties.sinePeriod || 2;
@@ -233,6 +233,12 @@ export class EngineRunner {
         
         inst.x += inst.vx * dt;
         inst.y += inst.vy * dt;
+
+        // Destroy bullet on solid collision
+        if (this.checkSolidCollision(inst)) {
+          this.liveInstances = this.liveInstances.filter(i => i.id !== inst.id);
+          this.onDebugLog(`Projétil destruído ao colidir com sólido`);
+        }
       }
 
       // 3. 8Direction Behavior (Enhanced diagonal management and custom controls)
@@ -360,6 +366,11 @@ export class EngineRunner {
 
         inst.y += inst.vy * dt;
         this.resolveSolidCollisions(inst, 'vertical');
+
+        // Reset onGround if not touching ground
+        if (inst.vy > 0 && inst.onGround) {
+          inst.onGround = false;
+        }
       }
 
       // 6. Bound to Layout Behavior can't exit screen limits
@@ -561,6 +572,60 @@ export class EngineRunner {
     return false;
   }
 
+  private checkSolidCollision(inst: LiveInstance): boolean {
+    const scene = this.project.scenes.find(s => s.id === this.project.currentSceneId);
+    if (!scene) return false;
+
+    // Check other solid instances
+    for (const other of this.liveInstances) {
+      if (other.id === inst.id) continue;
+      const otherObj = this.project.objects.find(o => o.id === other.objectTypeId);
+      if (!otherObj) continue;
+      if (!otherObj.behaviors.includes('Solid')) continue;
+
+      if (
+        inst.x + inst.width > other.x &&
+        inst.x < other.x + other.width &&
+        inst.y + inst.height > other.y &&
+        inst.y < other.y + other.height
+      ) {
+        return true;
+      }
+    }
+
+    // Check tilemap solids
+    const gs = scene.gridSize;
+    if (scene.tilemap && scene.tilemap.grid) {
+      const minCol = Math.floor(inst.x / gs);
+      const maxCol = Math.ceil((inst.x + inst.width) / gs);
+      const minRow = Math.floor(inst.y / gs);
+      const maxRow = Math.ceil((inst.y + inst.height) / gs);
+
+      for (let r = minRow; r <= maxRow; r++) {
+        for (let c = minCol; c <= maxCol; c++) {
+          const val = scene.tilemap.grid[`${c},${r}`];
+          const isTileSolid = val === 1 || val === 3;
+          if (val !== undefined && isTileSolid) {
+            const tileLeft = c * gs;
+            const tileRight = (c + 1) * gs;
+            const tileTop = r * gs;
+            const tileBottom = (r + 1) * gs;
+
+            if (
+              inst.x + inst.width > tileLeft &&
+              inst.x < tileRight &&
+              inst.y + inst.height > tileTop &&
+              inst.y < tileBottom
+            ) {
+              return true;
+            }
+          }
+        }
+      }
+    }
+    return false;
+  }
+
   private resolveSolidCollisions(inst: LiveInstance, direction: 'horizontal' | 'vertical') {
     const scene = this.project.scenes.find(s => s.id === this.project.currentSceneId);
     if (!scene) return;
@@ -672,6 +737,15 @@ export class EngineRunner {
   }
 
   private evaluateEventBlock(block: EventBlock, isStartup: boolean) {
+    // Empty conditions = always true (constante tick)
+    if (block.conditions.length === 0) {
+      block.actions.forEach(act => this.executeAction(act));
+      if (block.subEvents) {
+        block.subEvents.forEach(sub => this.evaluateEventBlock(sub, isStartup));
+      }
+      return;
+    }
+
     let conditionsMet = true;
 
     block.conditions.forEach(cond => {
@@ -696,6 +770,21 @@ export class EngineRunner {
           break;
         case 'keyboard_keyholding':
           conditionsMet = !!this.keysHeld[cond.param1 || ''];
+          break;
+        case 'mouse_click':
+          conditionsMet = false; // handled via evaluateMouseClickEvents
+          break;
+        case 'object_click':
+          conditionsMet = false; // handled via triggerClickEvent
+          break;
+        case 'function_called':
+          conditionsMet = false; // handled via call_function action
+          break;
+        case 'gesture_touch':
+          conditionsMet = false; // handled via handleTouchStart
+          break;
+        case 'timer_elapsed':
+          conditionsMet = false; // handled by Timer behavior tick
           break;
         case 'object_collision': {
           const selfObj = cond.param1;
@@ -831,8 +920,8 @@ export class EngineRunner {
       case 'object_set_scale': {
         const scl = parseFloat(act.param1 || '1');
         targets.forEach(t => {
-          t.width = (this.project.objects.find(o => o.id === t.objectTypeId)?.properties.speed || 32) * scl;
-          t.height = 32 * scl;
+          t.width = t.width * scl;
+          t.height = t.height * scl;
         });
         break;
       }

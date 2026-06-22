@@ -45,7 +45,7 @@ const INITIAL_PROJECT: GameProject = {
       ],
       animations: [{ id: 'walk', name: 'Andar', frames: ['p_frame_1'], speed: 6, loop: true }],
       currentAnimation: 'walk',
-      behaviors: ['Platformer', 'DestroyOutside'],
+      behaviors: ['Platform', 'BoundToLayout'],
       properties: {
         speed: 150,
         jumpStrength: 380,
@@ -534,6 +534,7 @@ export default function App() {
               selectedObject={selectedObj}
               onSelectObject={handleSelectObject}
               onAddObject={handleAddObject}
+              onUpdateObject={handleUpdateObject}
             />
           )}
 
