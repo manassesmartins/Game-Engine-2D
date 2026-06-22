@@ -9,9 +9,23 @@ const TILE_DEFS: TileDef[] = [
   { id: 6, color: '#FFC107', solid: false, name: 'Areia' },
 ];
 
+function defaultSettings() {
+  return {
+    windowWidth: 1280,
+    windowHeight: 720,
+    fps: 60,
+    renderMode: 'canvas2d' as const,
+    fullscreen: false,
+    pixelArt: true,
+    backgroundColor: '#1a1a2e',
+    startSceneId: '',
+  };
+}
+
 function emptyProject(): GameProject {
   return {
     name: 'Novo Jogo',
+    settings: defaultSettings(),
     objects: [],
     scenes: [],
     currentSceneId: '',
@@ -47,6 +61,7 @@ const platformerTemplate: GameTemplate = {
   category: 'platformer',
   project: {
     name: 'Meu Platformer',
+    settings: defaultSettings(),
     globalVariables: { Pontos: 0, Vidas: 3, Fase: 1 },
     objects: [
       {
@@ -175,6 +190,7 @@ const rpgTemplate: GameTemplate = {
   category: 'rpg',
   project: {
     name: 'Meu RPG',
+    settings: defaultSettings(),
     globalVariables: { Ouro: 0, HP: 100, MP: 50, Level: 1, EXP: 0 },
     objects: [
       {
@@ -273,6 +289,7 @@ const puzzleTemplate: GameTemplate = {
   category: 'puzzle',
   project: {
     name: 'Meu Puzzle',
+    settings: defaultSettings(),
     globalVariables: { Pontuacao: 0, Tempo: 60, Nivel: 1 },
     objects: [
       {
@@ -321,6 +338,7 @@ const arcadeTemplate: GameTemplate = {
   category: 'arcade',
   project: {
     name: 'Meu Arcade',
+    settings: defaultSettings(),
     globalVariables: { Score: 0, Level: 1, Lives: 3, Combo: 0 },
     objects: [
       {
@@ -417,6 +435,7 @@ const boardTemplate: GameTemplate = {
   category: 'board',
   project: {
     name: 'Meu Tabuleiro',
+    settings: defaultSettings(),
     globalVariables: { Turno: 1, Jogador1: 0, Jogador2: 0, Dado: 0 },
     objects: [
       {

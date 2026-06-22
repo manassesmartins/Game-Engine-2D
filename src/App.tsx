@@ -12,14 +12,16 @@ import EventSheetEditor from './components/EventSheetEditor';
 import AssetLibrary from './components/AssetLibrary';
 import Exporter from './components/Exporter';
 import PreviewModal from './components/PreviewModal';
+import ProjectProperties from './components/ProjectProperties';
 import WelcomeScreen from './components/WelcomeScreen';
-import { Layout, Calendar, Music, Sparkles, Package, Play, Save, FolderOpen, Layers } from 'lucide-react';
+import { Layout, Calendar, Music, Sparkles, Package, Play, Save, FolderOpen, Layers, Settings } from 'lucide-react';
 
 export default function App() {
   const [project, setProject] = useState<GameProject | null>(null);
   const [activeTab, setActiveTab] = useState<'layout' | 'events' | 'pixel' | 'audio' | 'library' | 'export'>('layout');
   const [selectedObj, setSelectedObj] = useState<ProjectObject | null>(null);
   const [isPreviewing, setIsPreviewing] = useState<boolean>(false);
+  const [showProjectProperties, setShowProjectProperties] = useState(false);
 
   const handleNewProject = (p: GameProject) => {
     setProject(p);
@@ -109,6 +111,10 @@ export default function App() {
     }
   };
 
+  const handleEditObjectType = (objId: string) => {
+    setActiveTab('pixel');
+  };
+
   const handleDeleteObject = (objId: string) => {
     const updatedObjects = project.objects.filter(o => o.id !== objId);
     const updatedScenes = project.scenes.map(sc => ({
@@ -142,7 +148,7 @@ export default function App() {
             C
           </button>
           <div>
-            <h1 className="text-xs font-bold text-[#E0E0E0]">Constructo 2D Studio</h1>
+            <h1 className="text-xs font-bold text-[#E0E0E0]">Lume Studio</h1>
             <input
               type="text"
               value={project.name}
@@ -176,6 +182,14 @@ export default function App() {
             className="text-[10px] text-[#A0A0A0] hover:text-white bg-[#3A3B44] hover:bg-[#4A4B54] border border-[#4A4B54] hover:border-[#5A5B64] py-1 px-2.5 rounded cursor-pointer flex items-center gap-1.5 font-medium transition-all"
           >
             <Save className="w-3 h-3" /> Salvar
+          </button>
+
+          <button
+            onClick={() => setShowProjectProperties(true)}
+            className="text-[10px] text-[#A0A0A0] hover:text-white bg-[#3A3B44] hover:bg-[#4A4B54] border border-[#4A4B54] hover:border-[#5A5B64] py-1 px-2.5 rounded cursor-pointer flex items-center gap-1.5 font-medium transition-all"
+            title="Propriedades do Projeto"
+          >
+            <Settings className="w-3 h-3" /> Projeto
           </button>
 
           <div className="h-4 w-[1px] bg-[#3A3B44]"></div>
@@ -230,6 +244,7 @@ export default function App() {
               onUpdateObject={handleUpdateObject}
               onDeleteObject={handleDeleteObject}
               onCloneObject={handleCloneObject}
+              onEditObjectType={handleEditObjectType}
             />
           )}
 
@@ -289,6 +304,15 @@ export default function App() {
         <PreviewModal
           project={project}
           onClose={() => setIsPreviewing(false)}
+        />
+      )}
+
+      {showProjectProperties && (
+        <ProjectProperties
+          settings={project.settings}
+          scenes={project.scenes}
+          onUpdateSettings={(s) => setProject({ ...project, settings: s })}
+          onClose={() => setShowProjectProperties(false)}
         />
       )}
     </div>

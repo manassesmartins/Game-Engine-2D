@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Scene, ProjectObject, ObjectInstance, TileDef, SceneLayer, TileMapLayer } from '../types';
 import { Move, GripHorizontal, LayoutGrid, Trash2, Plus, Sliders, Layers, Eye, EyeOff, Settings, Sparkles, PlusCircle, PaintBucket, Eraser, Square, MousePointer2, Copy, Edit3, FileDown } from 'lucide-react';
 import ContextMenu, { ContextMenuItem } from './ContextMenu';
@@ -18,6 +18,7 @@ interface SceneEditorProps {
   onUpdateObject?: (obj: ProjectObject) => void;
   onDeleteObject?: (objId: string) => void;
   onCloneObject?: (obj: ProjectObject) => void;
+  onEditObjectType?: (objId: string) => void;
 }
 
 const TILE_DEFINITIONS: TileDef[] = [
@@ -26,6 +27,52 @@ const TILE_DEFINITIONS: TileDef[] = [
   { id: 3, color: '#d97706', solid: true, name: 'Tijolo Sólido' },
   { id: 4, color: '#ef4444', solid: true, name: 'Lava Aquecida' }
 ];
+
+const BEHAVIORS = ['Platform','8Direction','Solid','JumpThru','BoundToLayout','ScrollTo','Bullet','Sine','Car','Flash','Fade','Timer','Pin','Physics','Pathfinding'];
+
+const BEHAVIOR_PARAMS: Record<string, { key: string; label: string; type: 'number' | 'boolean'; default: number | boolean }[]> = {
+  Platform: [
+    { key: 'speed', label: 'Velocidade (px/s)', type: 'number', default: 160 },
+    { key: 'jumpStrength', label: 'Força do Pulso', type: 'number', default: 400 },
+    { key: 'gravity', label: 'Gravidade', type: 'number', default: 850 },
+    { key: 'acceleration', label: 'Aceleração', type: 'number', default: 600 },
+    { key: 'deceleration', label: 'Desaceleração', type: 'number', default: 850 },
+    { key: 'doubleJump', label: 'Pulo Duplo', type: 'boolean', default: true },
+  ],
+  '8Direction': [
+    { key: 'speed', label: 'Velocidade (px/s)', type: 'number', default: 150 },
+  ],
+  Bullet: [
+    { key: 'bulletSpeed', label: 'Velocidade do Projétil', type: 'number', default: 300 },
+    { key: 'bulletGravity', label: 'Gravidade do Projétil', type: 'number', default: 0 },
+  ],
+  Sine: [
+    { key: 'sineAmplitude', label: 'Amplitude (px)', type: 'number', default: 60 },
+    { key: 'sinePeriod', label: 'Período (s)', type: 'number', default: 2.5 },
+  ],
+  Car: [
+    { key: 'carSpeed', label: 'Velocidade Máxima', type: 'number', default: 220 },
+    { key: 'carAcceleration', label: 'Aceleração', type: 'number', default: 180 },
+    { key: 'carDeceleration', label: 'Desaceleração', type: 'number', default: 100 },
+    { key: 'carTurnSpeed', label: 'Velocidade de Giro', type: 'number', default: 130 },
+    { key: 'carDriftFactor', label: 'Fator de Derrapagem', type: 'number', default: 0.75 },
+  ],
+  Flash: [
+    { key: 'flashDuration', label: 'Duração (s)', type: 'number', default: 1 },
+  ],
+  Fade: [
+    { key: 'fadeDuration', label: 'Duração (s)', type: 'number', default: 1.5 },
+  ],
+  Timer: [
+    { key: 'timerValue', label: 'Intervalo (s)', type: 'number', default: 2 },
+  ],
+  Physics: [
+    { key: 'gravity', label: 'Gravidade', type: 'number', default: 800 },
+  ],
+  Pathfinding: [
+    { key: 'speed', label: 'Velocidade (px/s)', type: 'number', default: 100 },
+  ],
+};
 
 export default function SceneEditor({
   scene,
@@ -36,7 +83,8 @@ export default function SceneEditor({
   onAddObject,
   onUpdateObject = () => {},
   onDeleteObject = () => {},
-  onCloneObject = () => {}
+  onCloneObject = () => {},
+  onEditObjectType = () => {}
 }: SceneEditorProps) {
   const [editorMode, setEditorMode] = useState<'instances' | 'tiles'>('instances');
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
@@ -57,6 +105,39 @@ export default function SceneEditor({
 
   const [activeTileId, setActiveTileId] = useState<number | string>(1);
   const [activeTilemapSource, setActiveTilemapSource] = useState<string>('default');
+
+  // Undo/Redo history
+  const [sceneHistory, setSceneHistory] = useState<Scene[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const isUndoRedoRef = useRef(false);
+
+  const handleUpdateScene = useCallback((updatedScene: Scene) => {
+    if (!isUndoRedoRef.current) {
+      const nextHistory = sceneHistory.slice(0, historyIndex + 1);
+      nextHistory.push(JSON.parse(JSON.stringify(scene)));
+      setSceneHistory(nextHistory);
+      setHistoryIndex(nextHistory.length - 1);
+    }
+    onUpdateScene(updatedScene);
+  }, [scene, sceneHistory, historyIndex, onUpdateScene]);
+
+  const handleUndo = useCallback(() => {
+    if (historyIndex < 0) return;
+    isUndoRedoRef.current = true;
+    const restored = sceneHistory[historyIndex];
+    setHistoryIndex(historyIndex - 1);
+    onUpdateScene(JSON.parse(JSON.stringify(restored)));
+    setTimeout(() => { isUndoRedoRef.current = false; }, 0);
+  }, [historyIndex, sceneHistory, onUpdateScene]);
+
+  const handleRedo = useCallback(() => {
+    if (historyIndex >= sceneHistory.length - 1) return;
+    isUndoRedoRef.current = true;
+    const restored = sceneHistory[historyIndex + 1];
+    setHistoryIndex(historyIndex + 1);
+    onUpdateScene(JSON.parse(JSON.stringify(restored)));
+    setTimeout(() => { isUndoRedoRef.current = false; }, 0);
+  }, [historyIndex, sceneHistory, onUpdateScene]);
   const [tileTool, setTileTool] = useState<'brush' | 'fill' | 'rect' | 'eraser'>('brush');
   const [rectStart, setRectStart] = useState<{ col: number, row: number } | null>(null);
   const [snapToGrid, setSnapToGrid] = useState<boolean>(true);
@@ -84,7 +165,7 @@ export default function SceneEditor({
       name: activeLayers.find(l => l.id === layerId)?.name || 'Tilemap',
       grid: {}
     };
-    onUpdateScene({
+    handleUpdateScene({
       ...scene,
       tilemaps: [...(scene.tilemaps || []), newTm]
     });
@@ -94,7 +175,7 @@ export default function SceneEditor({
   useEffect(() => {
     // If scene layers is not set, initialize it gracefully
     if (!scene.layers || scene.layers.length === 0) {
-      onUpdateScene({
+      handleUpdateScene({
         ...scene,
         layers: [
           { id: 'main_layer', name: 'Main (Jogo)', parallaxX: 1, parallaxY: 1, opacity: 1, visible: true },
@@ -112,15 +193,25 @@ export default function SceneEditor({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        const activeTagName = document.activeElement?.tagName.toLowerCase();
-        if (activeTagName === 'input' || activeTagName === 'textarea' || activeTagName === 'select') {
-          return;
-        }
+      const activeTagName = document.activeElement?.tagName.toLowerCase();
+      if (activeTagName === 'input' || activeTagName === 'textarea' || activeTagName === 'select') {
+        return;
+      }
 
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          handleRedo();
+        } else {
+          handleUndo();
+        }
+        return;
+      }
+
+      if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedInstanceIds.length > 0) {
           const remaining = scene.instances.filter(inst => !selectedInstanceIds.includes(inst.id));
-          onUpdateScene({ ...scene, instances: remaining });
+          handleUpdateScene({ ...scene, instances: remaining });
           updateSelectedInstances([]);
         }
       }
@@ -130,7 +221,7 @@ export default function SceneEditor({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [selectedInstanceIds, scene, onUpdateScene]);
+  }, [selectedInstanceIds, scene, handleUndo, handleRedo, handleUpdateScene]);
 
   useEffect(() => {
     drawLayout();
@@ -346,7 +437,7 @@ export default function SceneEditor({
     if (!updatedTilemaps.find(t => t.id === tm.id)) {
       updatedTilemaps.push({ ...tm, grid: updatedGrid });
     }
-    onUpdateScene({ ...scene, tilemaps: updatedTilemaps });
+    handleUpdateScene({ ...scene, tilemaps: updatedTilemaps });
   };
 
   const eraseTile = (col: number, row: number) => {
@@ -355,7 +446,7 @@ export default function SceneEditor({
     const key = `${col},${row}`;
     delete updatedGrid[key];
     const updatedTilemaps = (scene.tilemaps || []).map(t => t.id === tm.id ? { ...tm, grid: updatedGrid } : t);
-    onUpdateScene({ ...scene, tilemaps: updatedTilemaps });
+    handleUpdateScene({ ...scene, tilemaps: updatedTilemaps });
   };
 
   const floodFill = (col: number, row: number, fillId: number | string) => {
@@ -383,7 +474,7 @@ export default function SceneEditor({
       if (cy < rows - 1) stack.push(`${cx},${cy + 1}`);
     }
     const updatedTilemaps = (scene.tilemaps || []).map(t => t.id === tm.id ? { ...tm, grid } : t);
-    onUpdateScene({ ...scene, tilemaps: updatedTilemaps });
+    handleUpdateScene({ ...scene, tilemaps: updatedTilemaps });
   };
 
   const handleContextMenu = (e: React.MouseEvent) => {
@@ -476,7 +567,7 @@ export default function SceneEditor({
           originY: 0.5
         };
 
-        onUpdateScene({
+        handleUpdateScene({
           ...scene,
           instances: [...scene.instances, newInstance]
         });
@@ -610,7 +701,7 @@ export default function SceneEditor({
         return inst;
       });
 
-      onUpdateScene({
+      handleUpdateScene({
         ...scene,
         instances: updatedInstances
       });
@@ -638,7 +729,7 @@ export default function SceneEditor({
         }
       }
       const updatedTilemaps = (scene.tilemaps || []).map(t => t.id === tm.id ? { ...tm, grid: updatedGrid } : t);
-      onUpdateScene({ ...scene, tilemaps: updatedTilemaps });
+      handleUpdateScene({ ...scene, tilemaps: updatedTilemaps });
       setRectStart(null);
     }
 
@@ -661,7 +752,7 @@ export default function SceneEditor({
       }
       return inst;
     });
-    onUpdateScene({ ...scene, instances: updatedInstances });
+    handleUpdateScene({ ...scene, instances: updatedInstances });
   };
 
   const handleAddInstanceVariable = () => {
@@ -681,7 +772,7 @@ export default function SceneEditor({
       return inst;
     });
 
-    onUpdateScene({ ...scene, instances: updatedInstances });
+    handleUpdateScene({ ...scene, instances: updatedInstances });
     setNewVarName('');
     setNewVarValue('');
   };
@@ -699,7 +790,7 @@ export default function SceneEditor({
       }
       return inst;
     });
-    onUpdateScene({ ...scene, instances: updatedInstances });
+    handleUpdateScene({ ...scene, instances: updatedInstances });
   };
 
   const handleCloneObject = (objId: string) => {
@@ -726,11 +817,11 @@ export default function SceneEditor({
       x: source.x + 20,
       y: source.y + 20
     };
-    onUpdateScene({ ...scene, instances: [...scene.instances, clone] });
+    handleUpdateScene({ ...scene, instances: [...scene.instances, clone] });
   };
 
   const handleDeleteInstance = (instId: string) => {
-    onUpdateScene({
+    handleUpdateScene({
       ...scene,
       instances: scene.instances.filter(i => i.id !== instId)
     });
@@ -745,7 +836,7 @@ export default function SceneEditor({
       id: 'lay_' + Math.random().toString(36).substr(2, 5),
       name: source.name + '_Clone'
     };
-    onUpdateScene({ ...scene, layers: [...activeLayers, clone] });
+    handleUpdateScene({ ...scene, layers: [...activeLayers, clone] });
   };
 
   const renderContextMenu = () => {
@@ -757,7 +848,7 @@ export default function SceneEditor({
         const obj = objects.find(o => o.id === contextMenu.targetId);
         if (!obj) break;
         items = [
-          { id: 'edit', label: 'Editar', icon: <Edit3 className="w-3.5 h-3.5" />, onClick: () => onSelectObject(obj) },
+          { id: 'edit', label: 'Editar', icon: <Edit3 className="w-3.5 h-3.5" />, onClick: () => { onSelectObject(obj); onEditObjectType(obj.id); } },
           { id: 'clone', label: 'Clonar', icon: <Copy className="w-3.5 h-3.5" />, onClick: () => handleCloneObject(obj.id) },
           { id: 'div1', divider: true, label: '', onClick: () => {} },
           { id: 'delete', label: 'Apagar', icon: <Trash2 className="w-3.5 h-3.5" />, danger: true, onClick: () => handleDeleteObject(obj.id) },
@@ -817,7 +908,7 @@ export default function SceneEditor({
       visible: true
     };
 
-    onUpdateScene({
+    handleUpdateScene({
       ...scene,
       layers: [...activeLayers, newL]
     });
@@ -825,7 +916,7 @@ export default function SceneEditor({
 
   const handleUpdateLayer = (layId: string, updatedLay: Partial<SceneLayer>) => {
     const nextLayers = activeLayers.map(l => l.id === layId ? { ...l, ...updatedLay } : l);
-    onUpdateScene({
+    handleUpdateScene({
       ...scene,
       layers: nextLayers
     });
@@ -836,7 +927,7 @@ export default function SceneEditor({
       alert('Impossível remover a única camada restante!');
       return;
     }
-    onUpdateScene({
+    handleUpdateScene({
       ...scene,
       layers: activeLayers.filter(l => l.id !== layId),
       instances: scene.instances.map(i => i.layerId === layId ? { ...i, layerId: activeLayers[0].id } : i)
@@ -1205,7 +1296,7 @@ export default function SceneEditor({
                     <button
                       onClick={() => {
                         const remaining = scene.instances.filter(i => i.id !== selectedInst.id);
-                        onUpdateScene({ ...scene, instances: remaining });
+                        handleUpdateScene({ ...scene, instances: remaining });
                         setSelectedInstanceId(null);
                       }}
                       className="w-full flex items-center justify-center gap-1.5 text-xs bg-[#3A1A1A] hover:bg-[#5A2A2A] text-[#FF6B6B] border border-[#5A2A2A] py-2 rounded transition-all font-medium cursor-pointer mt-3"
@@ -1213,8 +1304,8 @@ export default function SceneEditor({
                       <Trash2 className="w-3.5 h-3.5" /> Deletar
                     </button>
                     
-                    {/* INJECT BEHAVIORS CONFIG HERE */}
-                      <div className="pt-3 border-t border-[#3A3B44] mt-3">
+                    {/* BEHAVIOR TOGGLES */}
+                    <div className="pt-3 border-t border-[#3A3B44] mt-3">
                       <h4 className="text-[10px] font-bold text-[#E0E0E0] mb-2 uppercase">Comportamentos</h4>
                       <div className="grid grid-cols-2 gap-1">
                         {[
@@ -1252,6 +1343,58 @@ export default function SceneEditor({
                         })}
                       </div>
                     </div>
+                    {/* BEHAVIOR PARAMETERS */}
+                    {(() => {
+                      const activeBehaviors = BEHAVIORS.filter(b => (selectedInstObjDef.behaviors || []).includes(b));
+                      const hasParams = activeBehaviors.some(b => BEHAVIOR_PARAMS[b]);
+                      if (!hasParams) return null;
+                      return (
+                        <div className="pt-3 border-t border-[#3A3B44] mt-3 space-y-3">
+                          <h4 className="text-[10px] font-bold text-[#FFA000] uppercase tracking-wider">Parâmetros</h4>
+                          {activeBehaviors.map(bName => {
+                            const params = BEHAVIOR_PARAMS[bName];
+                            if (!params) return null;
+                            return (
+                              <div key={bName} className="space-y-2">
+                                <span className="text-[9px] font-bold text-[#E0E0E0] block">{bName}</span>
+                                {params.map(p => {
+                                  const val = (selectedInstObjDef.properties || {})[p.key] ?? p.default;
+                                  if (p.type === 'boolean') {
+                                    return (
+                                      <label key={p.key} className="flex items-center gap-2 text-[10px] text-[#888] cursor-pointer">
+                                        <input
+                                          type="checkbox"
+                                          checked={!!val}
+                                          onChange={(e) => {
+                                            onUpdateObject({ ...selectedInstObjDef, properties: { ...selectedInstObjDef.properties, [p.key]: e.target.checked } });
+                                          }}
+                                          className="rounded accent-[#FFA000] w-3 h-3"
+                                        />
+                                        {p.label}
+                                      </label>
+                                    );
+                                  }
+                                  return (
+                                    <div key={p.key} className="flex items-center gap-2">
+                                      <label className="text-[9px] text-[#888] w-24 shrink-0">{p.label}</label>
+                                      <input
+                                        type="number"
+                                        step="any"
+                                        value={val as number}
+                                        onChange={(e) => {
+                                          onUpdateObject({ ...selectedInstObjDef, properties: { ...selectedInstObjDef.properties, [p.key]: parseFloat(e.target.value) || 0 } });
+                                        }}
+                                        className="flex-1 bg-[#1E1F26] border border-[#3A3B44] focus:border-[#FFA000] text-[10px] text-[#E0E0E0] rounded p-1 outline-none"
+                                      />
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
                     {/* END BEHAVIORS */}
                     
                   </div>
@@ -1306,7 +1449,7 @@ export default function SceneEditor({
               <button
                 onClick={() => {
                   const remaining = scene.instances.filter(inst => !selectedInstanceIds.includes(inst.id));
-                  onUpdateScene({ ...scene, instances: remaining });
+                  handleUpdateScene({ ...scene, instances: remaining });
                   updateSelectedInstances([]);
                 }}
                 className="ml-2 bg-[#3A1A1A] hover:bg-[#5A2A2A] text-[#FF6B6B] text-[9px] font-medium py-0.5 px-1.5 rounded transition-all flex items-center gap-1 uppercase"
@@ -1322,6 +1465,25 @@ export default function SceneEditor({
               }`}
             >
               <LayoutGrid className="w-3 h-3" /> Tilemap
+            </button>
+
+            <div className="h-4 w-[1px] bg-[#3A3B44] mx-2"></div>
+
+            <button
+              onClick={handleUndo}
+              disabled={historyIndex < 0}
+              className="text-[10px] p-1 rounded font-medium transition-all disabled:opacity-30 disabled:cursor-not-allowed text-[#888] hover:text-white hover:bg-[#3A3B44]"
+              title="Desfazer (Ctrl+Z)"
+            >
+              ↩
+            </button>
+            <button
+              onClick={handleRedo}
+              disabled={historyIndex >= sceneHistory.length - 1}
+              className="text-[10px] p-1 rounded font-medium transition-all disabled:opacity-30 disabled:cursor-not-allowed text-[#888] hover:text-white hover:bg-[#3A3B44]"
+              title="Refazer (Ctrl+Shift+Z)"
+            >
+              ↪
             </button>
           </div>
 

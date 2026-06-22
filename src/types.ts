@@ -272,8 +272,20 @@ export interface ArrayPluginData {
   values: (string | number)[];
 }
 
+export interface ProjectSettings {
+  windowWidth: number;
+  windowHeight: number;
+  fps: number;
+  renderMode: 'canvas2d' | 'webgl';
+  fullscreen: boolean;
+  pixelArt: boolean;
+  backgroundColor: string;
+  startSceneId: string;
+}
+
 export interface GameProject {
   name: string;
+  settings: ProjectSettings;
   objects: ProjectObject[];
   scenes: Scene[];
   currentSceneId: string;
