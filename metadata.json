@@ -1,0 +1,6 @@
+{
+  "name": "Engine de Jogos 2D No-Code",
+  "description": "Uma engine de jogos 2D inspirada no Construct 3, com programação visual por eventos, editor de cenas, tilesets, editor de pixel art, editor de som, sequenciador musical de 8-bits e suporte a multiplataforma.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
