@@ -10,8 +10,10 @@ import {
 } from '../types';
 import { 
   Play, Plus, Trash2, ArrowRight, Sparkles, FolderPlus, HelpCircle, Undo2, Redo2, 
-  Code, Settings, FileCode, Check, ListFilter, PlusCircle, Database, Braces 
+  Code, Settings, FileCode, Check, ListFilter, PlusCircle, Database, Braces,
+  Copy, Edit3, Eye, EyeOff, MessageSquare, Layers
 } from 'lucide-react';
+import ContextMenu, { ContextMenuItem } from './ContextMenu';
 
 interface EventSheetEditorProps {
   events: EventBlock[];
@@ -57,6 +59,8 @@ export default function EventSheetEditor({
   // Undo/Redo Event Sheet history tracking
   const [eventHistory, setEventHistory] = useState<EventBlock[][]>([]);
   const [historyIndex, setHistoryIndex] = useState<number>(-1);
+
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; type: 'eventBlock' | 'condition' | 'action'; targetBlockId?: string; targetCondId?: string; targetActId?: string } | null>(null);
 
   // New Global/Local Var creation
   const [newVarName, setNewVarName] = useState<string>('Pontos');
@@ -603,6 +607,7 @@ export default function EventSheetEditor({
               depth > 0 ? 'border-slate-800 bg-[#121319]' : 'border-[#262732] hover:border-slate-700'
             }`}
             id={`event_block_${block.id}`}
+            onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, type: 'eventBlock', targetBlockId: block.id }); }}
           >
             {/* Header block strip */}
             <div className="bg-[#181923] px-4 py-2.5 flex items-center justify-between border-b border-slate-850">
@@ -655,7 +660,7 @@ export default function EventSheetEditor({
                     <span className="text-[9px] text-gray-550 italic block p-1">Sempre ativo (Tick constante a cada quadro)</span>
                   ) : (
                     block.conditions.map(cond => (
-                      <div key={cond.id} className="bg-[#181923] border border-slate-850 p-2 rounded-lg text-[11px] text-slate-200 font-semibold shadow-inner">
+                      <div key={cond.id} onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, type: 'condition', targetBlockId: block.id, targetCondId: cond.id }); }} className="bg-[#181923] border border-slate-850 p-2 rounded-lg text-[11px] text-slate-200 font-semibold shadow-inner">
                         {getConditionLabel(cond)}
                       </div>
                     ))
@@ -680,7 +685,7 @@ export default function EventSheetEditor({
                     <span className="text-[9px] text-gray-550 italic block p-1">Nenhuma ação vinculada. Adicione uma ação.</span>
                   ) : (
                     block.actions.map(act => (
-                      <div key={act.id} className="bg-indigo-950/15 border border-[#27283c] p-2 rounded-lg text-[11px] text-[#a5b4fc] font-semibold flex items-center justify-between">
+                      <div key={act.id} onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, type: 'action', targetBlockId: block.id, targetActId: act.id }); }} className="bg-indigo-950/15 border border-[#27283c] p-2 rounded-lg text-[11px] text-[#a5b4fc] font-semibold flex items-center justify-between">
                         <span>{getActionLabel(act)}</span>
                       </div>
                     ))
@@ -752,7 +757,7 @@ export default function EventSheetEditor({
   const selectedScFile = scripts.find(s => s.id === selectedScriptId);
 
   return (
-    <div className="flex-1 flex overflow-hidden bg-[#1E1F26]" id="event_sheet_root">
+    <div className="flex-1 flex overflow-hidden bg-[#1E1F26]" id="event_sheet_root" onContextMenu={(e) => { /* allow our custom menus */ }}>
       
       {/* LEFT SIDE PANEL: Config Tab Selectors and Variables */}
       <div className="w-64 bg-[#14151e] border-r border-[#262732] flex flex-col justify-stretch p-4 space-y-4 shrink-0">
@@ -2295,6 +2300,60 @@ export default function EventSheetEditor({
           </div>
         </div>
       )}
+
+      {contextMenu && (() => {
+        const items: ContextMenuItem[] = [];
+        switch (contextMenu.type) {
+          case 'eventBlock': {
+            const ev = events.find(e => e.id === contextMenu.targetBlockId);
+            items.push(
+              { id: 'addSub', label: 'Adicionar Sub-Evento', icon: <Layers className="w-3.5 h-3.5" />, onClick: () => handleAddSubEvent(contextMenu.targetBlockId!) },
+              { id: 'comment', label: ev?.comment ? 'Editar Comentário' : 'Adicionar Comentário', icon: <MessageSquare className="w-3.5 h-3.5" />, onClick: () => {
+                const newComment = prompt('Comentário do bloco:', ev?.comment || '');
+                if (newComment !== null) {
+                  const updated = updateBlockInTree(events, contextMenu.targetBlockId!, (b) => ({ ...b, comment: newComment || undefined }));
+                  pushState(updated);
+                }
+              }},
+              { id: 'divider1', divider: true, label: '', onClick: () => {} },
+              { id: 'delete', label: 'Apagar Bloco', icon: <Trash2 className="w-3.5 h-3.5" />, danger: true, onClick: () => handleDeleteEventBlock(contextMenu.targetBlockId!) },
+            );
+            break;
+          }
+          case 'condition': {
+            items.push(
+              { id: 'deleteCond', label: 'Remover Condição', icon: <Trash2 className="w-3.5 h-3.5" />, danger: true, onClick: () => {
+                const updated = updateBlockInTree(events, contextMenu.targetBlockId!, (b) => ({
+                  ...b,
+                  conditions: b.conditions.filter(c => c.id !== contextMenu.targetCondId)
+                }));
+                pushState(updated);
+              }},
+            );
+            break;
+          }
+          case 'action': {
+            items.push(
+              { id: 'deleteAct', label: 'Remover Ação', icon: <Trash2 className="w-3.5 h-3.5" />, danger: true, onClick: () => {
+                const updated = updateBlockInTree(events, contextMenu.targetBlockId!, (b) => ({
+                  ...b,
+                  actions: b.actions.filter(a => a.id !== contextMenu.targetActId)
+                }));
+                pushState(updated);
+              }},
+            );
+            break;
+          }
+        }
+        return (
+          <ContextMenu
+            x={contextMenu.x}
+            y={contextMenu.y}
+            items={items}
+            onClose={() => setContextMenu(null)}
+          />
+        );
+      })()}
     </div>
   );
 }

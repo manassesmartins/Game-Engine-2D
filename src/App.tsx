@@ -109,10 +109,27 @@ export default function App() {
     }
   };
 
+  const handleDeleteObject = (objId: string) => {
+    const updatedObjects = project.objects.filter(o => o.id !== objId);
+    const updatedScenes = project.scenes.map(sc => ({
+      ...sc,
+      instances: sc.instances.filter(i => i.objectTypeId !== objId)
+    }));
+    setProject({ ...project, objects: updatedObjects, scenes: updatedScenes });
+    if (selectedObj?.id === objId) {
+      setSelectedObj(updatedObjects[0] || null);
+    }
+  };
+
+  const handleCloneObject = (obj: ProjectObject) => {
+    setProject({ ...project, objects: [...project.objects, obj] });
+    setSelectedObj(obj);
+  };
+
   const currentScene = project.scenes.find(s => s.id === project.currentSceneId) || project.scenes[0];
 
   return (
-    <div className="h-screen w-screen flex flex-col justify-stretch bg-[#1E1F26] text-[#E0E0E0] overflow-hidden select-none font-sans" id="studio_shell_container">
+    <div className="h-screen w-screen flex flex-col justify-stretch bg-[#1E1F26] text-[#E0E0E0] overflow-hidden select-none font-sans" id="studio_shell_container" onContextMenu={(e) => e.preventDefault()}>
       
       <header className="h-12 bg-[#2B2C33] border-b border-[#3A3B44] px-4 flex items-center justify-between z-10 shrink-0">
         
@@ -211,6 +228,8 @@ export default function App() {
               onSelectObject={handleSelectObject}
               onAddObject={handleAddObject}
               onUpdateObject={handleUpdateObject}
+              onDeleteObject={handleDeleteObject}
+              onCloneObject={handleCloneObject}
             />
           )}
 

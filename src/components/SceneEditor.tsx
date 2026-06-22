@@ -5,7 +5,8 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Scene, ProjectObject, ObjectInstance, TileDef, SceneLayer, TileMapLayer } from '../types';
-import { Move, GripHorizontal, LayoutGrid, Trash2, Plus, Sliders, Layers, Eye, EyeOff, Settings, Sparkles, PlusCircle, PaintBucket, Eraser, Square, MousePointer2 } from 'lucide-react';
+import { Move, GripHorizontal, LayoutGrid, Trash2, Plus, Sliders, Layers, Eye, EyeOff, Settings, Sparkles, PlusCircle, PaintBucket, Eraser, Square, MousePointer2, Copy, Edit3, FileDown } from 'lucide-react';
+import ContextMenu, { ContextMenuItem } from './ContextMenu';
 
 interface SceneEditorProps {
   scene: Scene;
@@ -15,6 +16,8 @@ interface SceneEditorProps {
   selectedObject: ProjectObject | null;
   onAddObject: () => void;
   onUpdateObject?: (obj: ProjectObject) => void;
+  onDeleteObject?: (objId: string) => void;
+  onCloneObject?: (obj: ProjectObject) => void;
 }
 
 const TILE_DEFINITIONS: TileDef[] = [
@@ -31,7 +34,9 @@ export default function SceneEditor({
   onSelectObject,
   selectedObject,
   onAddObject,
-  onUpdateObject = () => {}
+  onUpdateObject = () => {},
+  onDeleteObject = () => {},
+  onCloneObject = () => {}
 }: SceneEditorProps) {
   const [editorMode, setEditorMode] = useState<'instances' | 'tiles'>('instances');
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
@@ -61,6 +66,7 @@ export default function SceneEditor({
   const [newVarName, setNewVarName] = useState('');
   const [newVarValue, setNewVarValue] = useState('');
   
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; type: 'object' | 'instance' | 'layer' | 'canvas'; targetId?: string } | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Safeguard layers list
@@ -380,6 +386,31 @@ export default function SceneEditor({
     onUpdateScene({ ...scene, tilemaps: updatedTilemaps });
   };
 
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleCanvasContextMenu = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = (e.clientX - rect.left) / zoomScale;
+    const mouseY = (e.clientY - rect.top) / zoomScale;
+
+    const clicked = [...scene.instances].reverse().find(inst =>
+      mouseX >= inst.x && mouseX <= inst.x + inst.width &&
+      mouseY >= inst.y && mouseY <= inst.y + inst.height
+    );
+
+    if (clicked) {
+      setContextMenu({ x: e.clientX, y: e.clientY, type: 'instance', targetId: clicked.id });
+    } else {
+      setContextMenu({ x: e.clientX, y: e.clientY, type: 'canvas' });
+    }
+  };
+
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -669,6 +700,108 @@ export default function SceneEditor({
       return inst;
     });
     onUpdateScene({ ...scene, instances: updatedInstances });
+  };
+
+  const handleCloneObject = (objId: string) => {
+    const source = objects.find(o => o.id === objId);
+    if (!source) return;
+    const clone: ProjectObject = {
+      ...JSON.parse(JSON.stringify(source)),
+      id: 'obj_' + Math.random().toString(36).substr(2, 9),
+      name: source.name + '_Copia'
+    };
+    onCloneObject(clone);
+  };
+
+  const handleDeleteObject = (objId: string) => {
+    onDeleteObject(objId);
+  };
+
+  const handleCloneInstance = (instId: string) => {
+    const source = scene.instances.find(i => i.id === instId);
+    if (!source) return;
+    const clone: ObjectInstance = {
+      ...JSON.parse(JSON.stringify(source)),
+      id: 'inst_' + Math.random().toString(36).substr(2, 9),
+      x: source.x + 20,
+      y: source.y + 20
+    };
+    onUpdateScene({ ...scene, instances: [...scene.instances, clone] });
+  };
+
+  const handleDeleteInstance = (instId: string) => {
+    onUpdateScene({
+      ...scene,
+      instances: scene.instances.filter(i => i.id !== instId)
+    });
+    updateSelectedInstances(selectedInstanceIds.filter(id => id !== instId));
+  };
+
+  const handleCloneLayer = (layId: string) => {
+    const source = activeLayers.find(l => l.id === layId);
+    if (!source) return;
+    const clone: SceneLayer = {
+      ...JSON.parse(JSON.stringify(source)),
+      id: 'lay_' + Math.random().toString(36).substr(2, 5),
+      name: source.name + '_Clone'
+    };
+    onUpdateScene({ ...scene, layers: [...activeLayers, clone] });
+  };
+
+  const renderContextMenu = () => {
+    if (!contextMenu) return null;
+    let items: ContextMenuItem[] = [];
+
+    switch (contextMenu.type) {
+      case 'object': {
+        const obj = objects.find(o => o.id === contextMenu.targetId);
+        if (!obj) break;
+        items = [
+          { id: 'edit', label: 'Editar', icon: <Edit3 className="w-3.5 h-3.5" />, onClick: () => onSelectObject(obj) },
+          { id: 'clone', label: 'Clonar', icon: <Copy className="w-3.5 h-3.5" />, onClick: () => handleCloneObject(obj.id) },
+          { id: 'div1', divider: true, label: '', onClick: () => {} },
+          { id: 'delete', label: 'Apagar', icon: <Trash2 className="w-3.5 h-3.5" />, danger: true, onClick: () => handleDeleteObject(obj.id) },
+        ];
+        break;
+      }
+      case 'instance': {
+        const inst = scene.instances.find(i => i.id === contextMenu.targetId);
+        if (!inst) break;
+        items = [
+          { id: 'edit', label: 'Editar Propriedades', icon: <Edit3 className="w-3.5 h-3.5" />, onClick: () => { setSelectedInstanceId(inst.id); updateSelectedInstances([inst.id]); } },
+          { id: 'clone', label: 'Clonar Instância', icon: <Copy className="w-3.5 h-3.5" />, onClick: () => handleCloneInstance(inst.id) },
+          { id: 'div1', divider: true, label: '', onClick: () => {} },
+          { id: 'delete', label: 'Apagar Instância', icon: <Trash2 className="w-3.5 h-3.5" />, danger: true, onClick: () => handleDeleteInstance(inst.id) },
+        ];
+        break;
+      }
+      case 'layer': {
+        const layer = activeLayers.find(l => l.id === contextMenu.targetId);
+        if (!layer) break;
+        items = [
+          { id: 'activate', label: 'Ativar Camada', icon: <Eye className="w-3.5 h-3.5" />, onClick: () => setActiveLayerId(layer.id) },
+          { id: 'clone', label: 'Clonar Camada', icon: <Copy className="w-3.5 h-3.5" />, onClick: () => handleCloneLayer(layer.id) },
+          { id: 'div1', divider: true, label: '', onClick: () => {} },
+          { id: 'delete', label: 'Apagar Camada', icon: <Trash2 className="w-3.5 h-3.5" />, danger: true, onClick: () => handleDeleteLayer(layer.id) },
+        ];
+        break;
+      }
+      case 'canvas':
+        items = [
+          { id: 'addInst', label: 'Adicionar Instância', onClick: () => { setSceneTool('add'); } },
+          { id: 'paste', label: 'Colar Instância', disabled: true, onClick: () => {} },
+        ];
+        break;
+    }
+
+    return (
+      <ContextMenu
+        x={contextMenu.x}
+        y={contextMenu.y}
+        items={items}
+        onClose={() => setContextMenu(null)}
+      />
+    );
   };
 
   const handleAddSceneLayer = () => {
@@ -1214,6 +1347,7 @@ export default function SceneEditor({
               onMouseDown={handleCanvasMouseDown}
               onMouseMove={handleCanvasMouseMove}
               onMouseUp={handleCanvasMouseUp}
+              onContextMenu={handleCanvasContextMenu}
               className="cursor-crosshair block rounded bg-cover"
               id="layout_drawing_stage"
             />
@@ -1241,6 +1375,7 @@ export default function SceneEditor({
                   <div
                     key={obj.id}
                     onClick={() => onSelectObject(obj)}
+                    onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, type: 'object', targetId: obj.id }); }}
                     className={`flex flex-col items-center justify-center p-1 rounded cursor-pointer transition-all border ${
                       selectedObject?.id === obj.id
                         ? 'bg-[#3A3B44] border-[#FFA000] text-white'
@@ -1266,7 +1401,7 @@ export default function SceneEditor({
           </div>
           <div className="flex-1 overflow-y-auto p-2 space-y-1">
             {[...activeLayers].reverse().map((lay) => (
-              <div key={lay.id} className={`p-1.5 rounded border flex flex-col gap-1 ${
+              <div key={lay.id} onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, type: 'layer', targetId: lay.id }); }} className={`p-1.5 rounded border flex flex-col gap-1 ${
                 activeLayerId === lay.id ? 'bg-[#3A3B44] border-[#FFA000]' : 'bg-[#2B2C33] border-[#3A3B44]'
               }`}>
                 <div className="flex items-center justify-between w-full">
@@ -1296,6 +1431,9 @@ export default function SceneEditor({
         </div>
       </div>
 
+      {renderContextMenu()}
+
+      <div onContextMenu={handleContextMenu} className="fixed inset-0 pointer-events-none z-0" />
     </div>
   );
 }
