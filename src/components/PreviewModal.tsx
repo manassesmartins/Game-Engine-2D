@@ -5,7 +5,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { GameProject } from '../types';
-import { EngineRunner } from '../utils/engineRunner';
+import { EngineRunner } from '../engine/EngineRunner';
 import { Play, RotateCcw, X, AlertCircle } from 'lucide-react';
 
 interface PreviewModalProps {

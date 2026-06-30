@@ -103,6 +103,7 @@ export interface Scene {
 export type ConditionType =
   | 'system_onload'
   | 'system_tick'
+  | 'system_once'
   | 'every_x_seconds'
   | 'every_x_ticks'
   | 'trigger_once'
@@ -114,13 +115,17 @@ export type ConditionType =
   | 'object_collision'
   | 'object_click'
   | 'object_distance'
+  | 'object_count'
   | 'object_count_compare'
   | 'timer_elapsed'
+  | 'timer_elapsed_global'
   | 'animation_finished'
+  | 'animation_current'
   | 'function_called'
   | 'gesture_touch'
   | 'global_var_compare'
   | 'instance_var_compare'
+  | 'instance_exists'
   | 'compare_dictionary_value'
   | 'array_compare_at_index'
   | 'else_condition'
@@ -129,7 +134,8 @@ export type ConditionType =
   | 'pick_nearest'
   | 'pick_farthest'
   | 'double_jump_available'
-  | 'is_on_floor';
+  | 'is_on_floor'
+  | 'health_compare';
 
 export interface EventCondition {
   id: string;
@@ -186,7 +192,17 @@ export type ActionType =
   | 'broadcast_function'
   | 'set_gravity'
   | 'set_velocity'
-  | 'apply_force';
+  | 'apply_force'
+  | 'object_set_animation_speed'
+  | 'object_set_health'
+  | 'object_damage'
+  | 'object_set_z_index'
+  | 'object_set_collision_layer'
+  | 'object_set_collision_mask'
+  | 'object_set_property'
+  | 'particle_burst'
+  | 'stop_all_particles'
+  | 'scene_transition';
 
 export interface EventAction {
   id: string;

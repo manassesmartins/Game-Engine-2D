@@ -14,6 +14,7 @@ import Exporter from './components/Exporter';
 import PreviewModal from './components/PreviewModal';
 import ProjectProperties from './components/ProjectProperties';
 import WelcomeScreen from './components/WelcomeScreen';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { Layout, Calendar, Music, Sparkles, Package, Play, Save, FolderOpen, Layers, Settings } from 'lucide-react';
 
 export default function App() {
@@ -233,6 +234,7 @@ export default function App() {
         </nav>
 
         <main className="flex-1 flex overflow-hidden bg-[#1E1F26]">
+          <ErrorBoundary>
           {activeTab === 'layout' && (
             <SceneEditor
               scene={currentScene}
@@ -297,6 +299,7 @@ export default function App() {
           {activeTab === 'export' && (
             <Exporter project={project} />
           )}
+          </ErrorBoundary>
         </main>
       </div>
 

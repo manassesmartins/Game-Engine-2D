@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { 
-  EventBlock, ProjectObject, SoundPreset, ConditionType, ActionType, 
+  EventBlock, ProjectObject, SoundPreset, MusicTrack, ConditionType, ActionType, 
   EventCondition, EventAction, ScriptFile, DictionaryPluginData, ArrayPluginData 
 } from '../types';
 import { 
